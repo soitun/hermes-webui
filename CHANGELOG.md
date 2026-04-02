@@ -5,6 +5,21 @@
 
 ---
 
+## [v0.16.2] Model List Updates + base_url Passthrough
+*April 1, 2026 | 247 tests*
+
+### Bug Fixes
+- **MiniMax model list updated.** Replaced stale ABAB 6.5 models with current
+  MiniMax-M2.7, M2.7-highspeed, M2.5, M2.5-highspeed, M2.1 lineup matching
+  hermes-agent upstream. (Fixes #6)
+- **Z.AI/GLM model list updated.** Replaced GLM-4 series with current GLM-5,
+  GLM-5 Turbo, GLM-4.7, GLM-4.5, GLM-4.5 Flash lineup.
+- **base_url passthrough to AIAgent.** `resolve_model_provider()` now reads
+  `base_url` from config.yaml and passes it to AIAgent, so providers with
+  custom endpoints (MiniMax, Z.AI, local LLMs) route to the correct API.
+
+---
+
 ## [v0.16.1] Community Fixes -- Mobile + Auth + Provider Routing
 *April 1, 2026 | 247 tests*
 
@@ -426,4 +441,4 @@ Three-panel layout: sessions sidebar, chat area, workspace panel.
 
 ---
 
-*Last updated: v0.16.1, April 1, 2026 | Tests: 247*
+*Last updated: v0.16.2, April 1, 2026 | Tests: 247*
