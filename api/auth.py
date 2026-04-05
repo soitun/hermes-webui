@@ -57,7 +57,7 @@ def _hash_password(password):
     return dk.hex()
 
 
-def get_password_hash() -> bool:
+def get_password_hash() -> str | None:
     """Return the active password hash, or None if auth is disabled.
     Priority: env var > settings.json."""
     env_pw = os.getenv('HERMES_WEBUI_PASSWORD', '').strip()
@@ -110,7 +110,7 @@ def invalidate_session(cookie_value) -> None:
         _sessions.pop(token, None)
 
 
-def parse_cookie(handler) -> None:
+def parse_cookie(handler) -> str | None:
     """Extract the auth cookie from the request headers."""
     cookie_header = handler.headers.get('Cookie', '')
     if not cookie_header:

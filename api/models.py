@@ -34,13 +34,13 @@ def _write_session_index():
 
 
 class Session:
-    def __init__(self, session_id: int=None, title: str='Untitled',
+    def __init__(self, session_id: str=None, title: str='Untitled',
                  workspace=str(DEFAULT_WORKSPACE), model=DEFAULT_MODEL,
                  messages=None, created_at=None, updated_at=None,
                  tool_calls=None, pinned: bool=False, archived: bool=False,
-                 project_id: int=None, profile=None,
+                 project_id: str=None, profile=None,
                  input_tokens: int=0, output_tokens: int=0, estimated_cost=None,
-                 **kwargs: dict):
+                 **kwargs):
         self.session_id = session_id or uuid.uuid4().hex[:12]
         self.title = title
         self.workspace = str(Path(workspace).expanduser().resolve())
@@ -70,7 +70,7 @@ class Session:
         _write_session_index()
 
     @classmethod
-    def load(cls, sid) -> None:
+    def load(cls, sid):
         p = SESSION_DIR / f'{sid}.json'
         if not p.exists():
             return None
@@ -194,7 +194,7 @@ def save_projects(projects) -> None:
     PROJECTS_FILE.write_text(json.dumps(projects, ensure_ascii=False, indent=2), encoding='utf-8')
 
 
-def import_cli_session(session_id: int, title: str, messages, model: str='unknown', profile=None):
+def import_cli_session(session_id: str, title: str, messages, model: str='unknown', profile=None):
     """Create a new WebUI session populated with CLI messages.
     Returns the Session object.
     """
