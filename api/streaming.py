@@ -107,6 +107,9 @@ def _run_agent_streaming(session_id, msg_text, model, workspace, stream_id, atta
             HERMES_HOME=_profile_home,
         )
         # Still set process-level env as fallback for tools that bypass thread-local
+        # Acquire lock only for the env mutation, then release before the agent runs.
+        # The finally block re-acquires to restore — keeping critical sections short
+        # and preventing a deadlock where the restore would re-enter the same lock.
         with _ENV_LOCK:
           old_cwd = os.environ.get('TERMINAL_CWD')
           old_exec_ask = os.environ.get('HERMES_EXEC_ASK')
@@ -117,8 +120,8 @@ def _run_agent_streaming(session_id, msg_text, model, workspace, stream_id, atta
           os.environ['HERMES_SESSION_KEY'] = session_id
           if _profile_home:
               os.environ['HERMES_HOME'] = _profile_home
-
-          try:
+        # Lock released — agent runs without holding it
+        try:
             def on_token(text):
                 if text is None:
                     return  # end-of-stream sentinel
@@ -378,16 +381,16 @@ def _run_agent_streaming(session_id, msg_text, model, workspace, stream_id, atta
                 usage['threshold_tokens'] = getattr(_cc, 'threshold_tokens', 0) or 0
                 usage['last_prompt_tokens'] = getattr(_cc, 'last_prompt_tokens', 0) or 0
             put('done', {'session': s.compact() | {'messages': s.messages, 'tool_calls': tool_calls}, 'usage': usage})
-          finally:
+        finally:
             with _ENV_LOCK:
-              if old_cwd is None: os.environ.pop('TERMINAL_CWD', None)
-              else: os.environ['TERMINAL_CWD'] = old_cwd
-              if old_exec_ask is None: os.environ.pop('HERMES_EXEC_ASK', None)
-              else: os.environ['HERMES_EXEC_ASK'] = old_exec_ask
-              if old_session_key is None: os.environ.pop('HERMES_SESSION_KEY', None)
-              else: os.environ['HERMES_SESSION_KEY'] = old_session_key
-              if old_hermes_home is None: os.environ.pop('HERMES_HOME', None)
-              else: os.environ['HERMES_HOME'] = old_hermes_home
+                if old_cwd is None: os.environ.pop('TERMINAL_CWD', None)
+                else: os.environ['TERMINAL_CWD'] = old_cwd
+                if old_exec_ask is None: os.environ.pop('HERMES_EXEC_ASK', None)
+                else: os.environ['HERMES_EXEC_ASK'] = old_exec_ask
+                if old_session_key is None: os.environ.pop('HERMES_SESSION_KEY', None)
+                else: os.environ['HERMES_SESSION_KEY'] = old_session_key
+                if old_hermes_home is None: os.environ.pop('HERMES_HOME', None)
+                else: os.environ['HERMES_HOME'] = old_hermes_home
 
     except Exception as e:
         print('[webui] stream error:\n' + traceback.format_exc(), flush=True)

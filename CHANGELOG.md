@@ -5,6 +5,17 @@
 
 ---
 
+## [v0.39.1] — 2026-04-08
+
+### Bug Fixes
+- **_ENV_LOCK deadlock resolved.** The environment variable lock was held for
+  the entire duration of agent execution (including all tool calls and streaming),
+  blocking all concurrent requests. Now the lock is acquired only for the brief
+  env variable read/write operations, released before the agent runs, and
+  re-acquired in the finally block for restoration.
+
+---
+
 ## [v0.39.0] — 2026-04-08
 
 ### Security (12 fixes — PR #171 by @betamod, reviewed by @nesquena-hermes)
