@@ -5,6 +5,11 @@
 ### Fixed
 - **Reasoning chip now appears after the model chip** in the composer toolbar — model is a more fundamental choice and should be stable in position regardless of whether reasoning is active. Order: Profile → Workspace → Model → Reasoning. (`static/index.html`)
 
+## v0.50.201 — 2026-04-24
+
+### Fixed
+- **Streaming render cleanup: call `clearTimeout` at all `_pendingRafHandle` sites** — PR #966's render-throttling logic uses `setTimeout(→rAF)` when within the 66ms budget window, so `_pendingRafHandle` can hold a `setTimeout` ID rather than a `requestAnimationFrame` ID. All four cleanup sites only called `cancelAnimationFrame()`, which is a no-op for `setTimeout` handles, leaving stale callbacks that could fire after stream finalization. Fixed to call both `clearTimeout()` and `cancelAnimationFrame()` (each is a no-op on the other's handle type). (`static/messages.js`) [#985]
+
 ## v0.50.200 — 2026-04-24
 
 ### Changed
