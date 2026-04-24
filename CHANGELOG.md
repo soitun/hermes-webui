@@ -5,6 +5,11 @@
 ### Fixed
 - **Reasoning chip now appears after the model chip** in the composer toolbar — model is a more fundamental choice and should be stable in position regardless of whether reasoning is active. Order: Profile → Workspace → Model → Reasoning. (`static/index.html`)
 
+## v0.50.188 — 2026-04-24
+
+### Fixed
+- **`/btw` command: corrected SSE endpoint** — `attachBtwStream()` was connecting to `/api/stream` (which has never existed), causing every `/btw` invocation to get a 404 and produce no answer. Fixed to `/api/chat/stream`. Also aligned the `EventSource` constructor to use `URL()` + `withCredentials:true` for consistency with the rest of `static/messages.js`. (`static/messages.js`) By @bergeouss. Closes #945. [#950]
+
 ## v0.50.187 — 2026-04-24
 
 ### Fixed
