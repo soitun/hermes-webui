@@ -86,15 +86,24 @@ class TestSlashCommandHandlers:
         assert "queueSessionMessage" in body, "/interrupt must queue the new message before cancelling"
         assert "cancelStream" in body, "/interrupt must call cancelStream() so the drain re-sends"
 
-    def test_cmd_steer_falls_back_to_interrupt(self):
-        """Steer is a placeholder — currently uses interrupt semantics with a different toast."""
+    def test_cmd_steer_delegates_to_try_steer(self):
+        """/steer delegates to _trySteer which calls /api/chat/steer with
+        a queue+cancel fallback. The fallback path is exercised by tests
+        in test_real_steer.py — this test just pins the delegation."""
         idx = COMMANDS_JS.find("async function cmdSteer(")
         assert idx >= 0
         body = COMMANDS_JS[idx:idx + 800]
-        assert "queueSessionMessage" in body
-        assert "cancelStream" in body
-        # Toast should differ from interrupt to signal the placeholder
-        assert "cmd_steer_fallback" in body or "steer_fallback" in body
+        # cmdSteer now delegates to _trySteer; the fallback (queueSessionMessage
+        # + cancelStream) lives inside _trySteer.
+        assert "_trySteer" in body, "cmdSteer must call _trySteer to use the real /api/chat/steer endpoint"
+        # The shared helper must contain the fallback path
+        helper_idx = COMMANDS_JS.find("async function _trySteer(")
+        assert helper_idx >= 0, "_trySteer helper must exist"
+        helper_body = COMMANDS_JS[helper_idx:helper_idx + 1500]
+        assert "queueSessionMessage" in helper_body
+        assert "cancelStream" in helper_body
+        # Toast should differ from interrupt to signal it's the steer path
+        assert "cmd_steer_fallback" in helper_body or "steer_fallback" in helper_body
 
 
 # ── send() busy branch ───────────────────────────────────────────────────
