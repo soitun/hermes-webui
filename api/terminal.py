@@ -151,7 +151,14 @@ def start_terminal(session_id: str, workspace: Path, rows: int = 24, cols: int =
             close_terminal(sid)
 
         master_fd, slave_fd = os.openpty()
-        env = os.environ.copy()
+        # Build a safe env: allowlist common shell vars, strip API keys and secrets.
+        # The PTY shell is an interactive UI surface — do not leak server credentials.
+        _SAFE_ENV_KEYS = {
+            "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL",
+            "LC_CTYPE", "LC_MESSAGES", "LANGUAGE", "TZ", "TMPDIR", "TEMP",
+            "XDG_RUNTIME_DIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME",
+        }
+        env = {k: v for k, v in os.environ.items() if k in _SAFE_ENV_KEYS}
         env.update(
             {
                 "TERM": "xterm-256color",

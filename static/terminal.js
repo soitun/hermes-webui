@@ -33,6 +33,7 @@ function _terminalEls(){
     toggle:$('btnTerminalToggle'),
     workspace:$('terminalWorkspaceLabel'),
     dockWorkspace:$('terminalDockWorkspaceLabel'),
+    handle:$('terminalResizeHandle'),
   };
 }
 

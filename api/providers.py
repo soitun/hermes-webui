@@ -323,15 +323,20 @@ def get_providers() -> dict[str, Any]:
             # are pure API-key providers — calling get_auth_status() for every
             # unconfigured API-key provider would add unnecessary latency
             # (network round-trip per provider) on the Settings page.
-            try:
-                from hermes_cli.auth import get_auth_status as _gas
-                status = _gas(pid)
-                if isinstance(status, dict) and status.get("logged_in"):
-                    has_key = True
-                    key_source = status.get("key_source", "oauth")
-                    is_oauth = True
-            except Exception:
-                pass
+            # Validate pid looks like a real provider before probing
+            import re as _re
+            if _re.match(r'^[a-z][a-z0-9_-]{0,63}$', pid):
+                try:
+                    from hermes_cli.auth import get_auth_status as _gas
+                    status = _gas(pid)
+                    if isinstance(status, dict) and status.get("logged_in"):
+                        has_key = True
+                        # Constrain key_source to a known-safe closed set
+                        _raw_ks = status.get("key_source", "")
+                        key_source = _raw_ks if _raw_ks in {"oauth", "env", "config", "token"} else "oauth"
+                        is_oauth = True
+                except Exception:
+                    pass
 
         models = _PROVIDER_MODELS.get(pid, [])
         # Also include models from config.yaml providers section

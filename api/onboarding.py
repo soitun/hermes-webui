@@ -117,6 +117,15 @@ _SUPPORTED_PROVIDER_SETUPS = {
         "models": list(_PROVIDER_MODELS.get("zai", [])),
         "category": "specialized",
     },
+    "nvidia": {
+        "label": "NVIDIA NIM",
+        "env_var": "NVIDIA_API_KEY",
+        "default_model": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+        "default_base_url": "https://integrate.api.nvidia.com/v1",
+        "requires_base_url": False,
+        "models": list(_PROVIDER_MODELS.get("nvidia", [])),
+        "category": "specialized",
+    },
     "mistralai": {
         "label": "Mistral",
         "env_var": "MISTRAL_API_KEY",

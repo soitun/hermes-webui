@@ -876,9 +876,16 @@ def _deduplicate_model_ids(groups: list[dict]) -> None:
     if not groups:
         return
 
-    # Collect {bare_id: [(group_idx, model_idx), ...]}
+    # Collect {bare_id: [(group_idx, model_idx), ...]} in alphabetical
+    # provider_id order so that the "first occurrence stays bare" rule is
+    # deterministic across config edits (adding/removing/reordering providers).
+    sorted_group_indices = sorted(
+        range(len(groups)),
+        key=lambda i: groups[i].get("provider_id", ""),
+    )
     id_map: dict[str, list[tuple[int, int]]] = {}
-    for gi, group in enumerate(groups):
+    for gi in sorted_group_indices:
+        group = groups[gi]
         pid = group.get("provider_id", "")
         for mi, model in enumerate(group.get("models", [])):
             mid = model.get("id", "")

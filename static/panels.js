@@ -3283,10 +3283,20 @@ function loadMcpServers(){
           <span class="mcp-server-name">${esc(s.name)}</span>${badge}
         </div>
         <div class="mcp-server-detail">${esc(detail)}${envInfo?' | '+esc(envInfo):''}</div>
-        <button class="mcp-delete-btn" onclick="deleteMcpServer('${esc(s.name)}')" title="Delete">&times;</button>
+        <button class="mcp-delete-btn" data-mcp-name="${esc(s.name)}" title="Delete">&times;</button>
       </div>`;
     }).join('');
   }).catch(()=>{list.innerHTML=`<div style="color:#ef4444;font-size:12px;padding:6px 0">${t('mcp_load_failed')}</div>`});
+  // Delegate delete-button clicks — uses data-mcp-name to avoid inline onclick XSS
+  if(list&&!list._mcpDeleteBound){
+    list._mcpDeleteBound=true;
+    list.addEventListener('click',function(e){
+      const btn=e.target.closest('.mcp-delete-btn');
+      if(!btn) return;
+      const name=btn.getAttribute('data-mcp-name');
+      if(name) deleteMcpServer(name);
+    });
+  }
 }
 
 function showMcpAddForm(){

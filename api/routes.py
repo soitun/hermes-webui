@@ -68,6 +68,7 @@ _OPENAI_COMPAT_ENDPOINTS = {
     "xai": "https://api.x.ai/v1",
     "deepseek": "https://api.deepseek.com",
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
+    "nvidia": "https://integrate.api.nvidia.com/v1",
 }
 # NOTE: "openai-codex" is excluded because it maps to the same endpoint as
 # the base "openai" provider (api.openai.com/v1).  When both are configured
@@ -3325,6 +3326,11 @@ def _handle_cron_run(handler, body):
     job = get_job(job_id)
     if not job:
         return bad(handler, "Job not found", 404)
+    # Prevent double-run: reject if the job is already tracked as running
+    already_running, elapsed = _is_cron_running(job_id)
+    if already_running:
+        return j(handler, {"ok": False, "job_id": job_id, "status": "already_running",
+                            "elapsed": round(elapsed, 1)})
     _mark_cron_running(job_id)
     threading.Thread(target=_run_cron_tracked, args=(job,), daemon=True).start()
     return j(handler, {"ok": True, "job_id": job_id, "status": "running"})

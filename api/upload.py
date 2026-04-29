@@ -133,10 +133,9 @@ def extract_archive(file_bytes: bytes, filename: str, workspace: Path):
                         continue
                     # Zip-slip protection
                     member_path = (dest_dir / member.filename).resolve()
-                    if not str(member_path).startswith(str(dest_dir.resolve())):
+                    if not member_path.is_relative_to(dest_dir.resolve()):
                         raise ValueError(f'Zip-slip blocked: {member.filename}')
-                    # Zip-bomb protection: enforce cumulative extraction limit
-                    total_extracted += member.file_size
+                    # Zip-bomb protection: track actual extracted bytes (not declared file_size)
                     if total_extracted > _MAX_EXTRACTED_BYTES:
                         raise ValueError(
                             f'Extraction too large ({total_extracted // (1024*1024)} MB > '
@@ -145,7 +144,19 @@ def extract_archive(file_bytes: bytes, filename: str, workspace: Path):
                         )
                     member_path.parent.mkdir(parents=True, exist_ok=True)
                     with zf.open(member) as src, open(member_path, 'wb') as dst:
-                        dst.write(src.read())
+                        _chunk_size = 65536
+                        while True:
+                            chunk = src.read(_chunk_size)
+                            if not chunk:
+                                break
+                            total_extracted += len(chunk)
+                            if total_extracted > _MAX_EXTRACTED_BYTES:
+                                raise ValueError(
+                                    f'Extraction too large (> '
+                                    f'{_MAX_EXTRACTED_BYTES // (1024*1024)} MB limit). '
+                                    f'Possible zip bomb.'
+                                )
+                            dst.write(chunk)
                     extracted_files.append(str(member_path.relative_to(workspace.resolve())))
 
         elif _mode == 'tar':
@@ -155,10 +166,9 @@ def extract_archive(file_bytes: bytes, filename: str, workspace: Path):
                         continue
                     # Tar-slip protection
                     member_path = (dest_dir / member.name).resolve()
-                    if not str(member_path).startswith(str(dest_dir.resolve())):
+                    if not member_path.is_relative_to(dest_dir.resolve()):
                         raise ValueError(f'Tar-slip blocked: {member.name}')
-                    # Tar-bomb protection: enforce cumulative extraction limit
-                    total_extracted += member.size
+                    # Tar-bomb protection: track actual extracted bytes (not declared size)
                     if total_extracted > _MAX_EXTRACTED_BYTES:
                         raise ValueError(
                             f'Extraction too large ({total_extracted // (1024*1024)} MB > '
@@ -166,9 +176,22 @@ def extract_archive(file_bytes: bytes, filename: str, workspace: Path):
                             f'Possible zip bomb.'
                         )
                     member_path.parent.mkdir(parents=True, exist_ok=True)
-                    with tf.extractfile(member) as src, open(member_path, 'wb') as dst:
-                        if src:
-                            dst.write(src.read())
+                    src_obj = tf.extractfile(member)
+                    if src_obj:
+                        with src_obj as src, open(member_path, 'wb') as dst:
+                            _chunk_size = 65536
+                            while True:
+                                chunk = src.read(_chunk_size)
+                                if not chunk:
+                                    break
+                                total_extracted += len(chunk)
+                                if total_extracted > _MAX_EXTRACTED_BYTES:
+                                    raise ValueError(
+                                        f'Extraction too large (> '
+                                        f'{_MAX_EXTRACTED_BYTES // (1024*1024)} MB limit). '
+                                        f'Possible zip bomb.'
+                                    )
+                                dst.write(chunk)
                     extracted_files.append(str(member_path.relative_to(workspace.resolve())))
     except Exception:
         # Clean up partially-extracted directory to avoid orphaned folders
