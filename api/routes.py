@@ -328,7 +328,14 @@ def _resolve_compatible_session_model(model_id: str | None) -> tuple[str, bool]:
             or (provider_normalized and provider_normalized == active_provider)
         )
         if hint_matches_active:
-            return bare_model, True
+            # The @provider:model hint explicitly names the active provider, so this
+            # selection is intentional — not a stale cross-provider artifact. Return
+            # the full @provider:model string unchanged so downstream (resolve_model_provider
+            # in config.py) can route through the correct provider. Stripping the prefix
+            # here would collapse duplicate model IDs from different providers back to the
+            # bare ID, causing the first matching provider to win on the next UI render
+            # and the wrong provider to be used for the agent run. (#1253)
+            return model, False
 
         if _catalog_has_provider(
             provider_raw,
