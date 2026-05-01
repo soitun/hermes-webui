@@ -1983,7 +1983,7 @@ async function switchToWorkspace(path,name){
   try{
     closeWsDropdown();
     await api('/api/session/update',{method:'POST',body:JSON.stringify({
-      session_id:S.session.session_id, workspace:path, model:S.session.model
+      session_id:S.session.session_id, workspace:path, model:S.session.model, model_provider:S.session.model_provider||null
     })});
     S.session.workspace=path;
     // Explicit workspace switch = user overriding any pending profile-switch default.
@@ -2236,7 +2236,8 @@ async function switchToProfile(name) {
     // ── Model + Workspace (parallelized) ───────────────────────────────────
     // populateModelDropdown hits /api/models; loadWorkspaceList hits /api/workspaces.
     // They are fully independent — run both simultaneously to cut switch time ~50%.
-    localStorage.removeItem('hermes-webui-model');
+    if(typeof _clearPersistedModelState==='function') _clearPersistedModelState();
+    else localStorage.removeItem('hermes-webui-model');
     _skillsData = null;
     _workspaceList = null;
     await Promise.all([populateModelDropdown(), loadWorkspaceList()]);
@@ -2246,10 +2247,15 @@ async function switchToProfile(name) {
       const sel = $('modelSelect');
       const resolved = _applyModelToDropdown(data.default_model, sel, window._activeProvider||null);
       const modelToUse = resolved || data.default_model;
+      const modelState = (typeof _modelStateForSelect==='function')
+        ? _modelStateForSelect(sel, modelToUse)
+        : {model:modelToUse,model_provider:null};
       S._pendingProfileModel = modelToUse;
+      S._pendingProfileModelProvider = modelState.model_provider||null;
       // Only patch the in-memory session model if we're NOT about to replace the session
       if (S.session && !sessionInProgress) {
         S.session.model = modelToUse;
+        S.session.model_provider = modelState.model_provider||null;
       }
     }
 
@@ -2269,6 +2275,7 @@ async function switchToProfile(name) {
             session_id: S.session.session_id,
             workspace: data.default_workspace,
             model: S.session.model,
+            model_provider: S.session.model_provider||null,
           })});
           S.session.workspace = data.default_workspace;
         } catch (_) {}
@@ -2289,6 +2296,7 @@ async function switchToProfile(name) {
             session_id: S.session.session_id,
             workspace: S._profileDefaultWorkspace,
             model: S.session.model,
+            model_provider: S.session.model_provider||null,
           })});
           S.session.workspace = S._profileDefaultWorkspace;
         } catch (_) {}
