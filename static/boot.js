@@ -689,9 +689,24 @@ window._micPendingSend=window._micPendingSend||false;
 })();
 $('fileInput').onchange=e=>{addFiles(Array.from(e.target.files));e.target.value='';};
 $('btnNewChat').onclick=async()=>{
-  // If the current session has no messages, just focus the composer rather than
-  // creating another empty session that will clutter the sidebar list (#1171).
-  if(S.session&&(S.session.message_count||0)===0){$('msg').focus();closeMobileSidebar();return;}
+  // If the current session has no messages AND nothing is in flight, just focus
+  // the composer rather than creating another empty session that will clutter the
+  // sidebar list (#1171).
+  //
+  // The "nothing in flight" half is critical (#1432): if the user clicks + while
+  // their first message is still streaming (or queued), `message_count` is still 0
+  // server-side because the user turn hasn't been merged yet. The old guard treated
+  // that as "empty" and made + a no-op for the entire stream duration, so users
+  // couldn't actually start a parallel chat. Use the same in-flight signal as
+  // `_restoreSettledSession()` in messages.js: an active stream id or a queued
+  // pending user message means the session is real, not empty.
+  if(S.session
+     && (S.session.message_count||0)===0
+     && !S.busy
+     && !S.session.active_stream_id
+     && !S.session.pending_user_message){
+    $('msg').focus();closeMobileSidebar();return;
+  }
   await newSession();await renderSessionList();closeMobileSidebar();$('msg').focus();
 };
 $('btnDownload').onclick=()=>{
@@ -839,9 +854,17 @@ document.addEventListener('keydown',async e=>{
   }
   if((e.metaKey||e.ctrlKey)&&e.key==='k'){
     e.preventDefault();
-    // If the current session has no messages, just focus the composer rather than
-    // creating another empty session that will clutter the sidebar list (#1171).
-    if(S.session&&(S.session.message_count||0)===0){$('msg').focus();return;}
+    // If the current session has no messages AND nothing is in flight, just focus
+    // the composer rather than creating another empty session that will clutter
+    // the sidebar list (#1171). See the matching guard in $('btnNewChat').onclick
+    // and bug #1432 for why the in-flight check is needed.
+    if(S.session
+       && (S.session.message_count||0)===0
+       && !S.busy
+       && !S.session.active_stream_id
+       && !S.session.pending_user_message){
+      $('msg').focus();return;
+    }
     // Cmd/Ctrl+K should always create a new conversation, even while the current
     // one is still streaming. The old !S.busy guard meant users had to wait for
     // a long generation to finish before they could start something new — exactly

@@ -463,14 +463,16 @@ def test_new_conversation_closes_mobile_sidebar():
     # Handler is now multi-line — search for the full block rather than a single line.
     assert "$('btnNewChat').onclick" in boot_js, "btnNewChat onclick handler missing from static/boot.js"
     # Find the handler block and verify closeMobileSidebar appears in it.
+    # The handler grew comments after #1432 (in-flight guard refactor), so use a
+    # generous window to cover the full handler body.
     idx = boot_js.find("$('btnNewChat').onclick")
-    handler_block = boot_js[idx:idx+500]
+    handler_block = boot_js[idx:idx+1500]
     assert "closeMobileSidebar" in handler_block, \
         "btnNewChat handler must closeMobileSidebar() after creating the new session"
 
     shortcut_line = next((ln for ln in boot_js.splitlines() if "e.key==='k'" in ln or "e.key === 'k'" in ln), "")
     assert shortcut_line, "Cmd/Ctrl+K new chat shortcut missing from static/boot.js"
-    shortcut_block = "\n".join(boot_js.splitlines()[boot_js.splitlines().index(shortcut_line):boot_js.splitlines().index(shortcut_line)+12])
+    shortcut_block = "\n".join(boot_js.splitlines()[boot_js.splitlines().index(shortcut_line):boot_js.splitlines().index(shortcut_line)+24])
     assert "closeMobileSidebar" in shortcut_block, \
         "Cmd/Ctrl+K new chat shortcut must closeMobileSidebar() after creating the new session"
 

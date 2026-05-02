@@ -2529,7 +2529,7 @@ function _renderProfileForm(){
       <form class="detail-form" onsubmit="event.preventDefault(); saveProfileForm();">
         <div class="detail-form-row">
           <label for="profileFormName">${esc(t('profile_name_label') || 'Name')}</label>
-          <input type="text" id="profileFormName" placeholder="${esc(t('profile_name_placeholder') || 'lowercase, a-z 0-9 hyphens')}" autocomplete="off" required>
+          <input type="text" id="profileFormName" placeholder="${esc(t('profile_name_placeholder') || 'lowercase, a-z 0-9 hyphens')}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" required>
           <div class="detail-form-hint">${esc(t('profile_name_rule') || 'Lowercase letters, numbers, hyphens, underscores only.')}</div>
         </div>
         <div class="detail-form-row">
@@ -2539,7 +2539,7 @@ function _renderProfileForm(){
         </div>
         <div class="detail-form-row">
           <label for="profileFormBaseUrl">${esc(t('profile_base_url_label') || 'Base URL')}</label>
-          <input type="text" id="profileFormBaseUrl" placeholder="${esc(t('profile_base_url_placeholder') || 'Optional, e.g. http://localhost:11434')}" autocomplete="off">
+          <input type="text" id="profileFormBaseUrl" placeholder="${esc(t('profile_base_url_placeholder') || 'Optional, e.g. http://localhost:11434')}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
         </div>
         <div class="detail-form-row">
           <label for="profileFormApiKey">${esc(t('profile_api_key_label') || 'API key')}</label>
