@@ -928,6 +928,13 @@ function _applyToolsetsChip(toolsets) {
   const label = $('composerToolsetsLabel');
   const chip = $('composerToolsetsChip');
   if (!wrap || !label) return;
+  // Visibility is controlled entirely by responsive CSS — the chip shows only
+  // at wide composer-footer widths (>= 1100px container query). At narrower
+  // widths the layout is too cramped (model + reasoning + profile + workspace
+  // + context-ring + send) to add another chip. Cleared inline style so the
+  // CSS @container query is the single source of truth. State is still
+  // tracked so /api/session/toolsets continues to work for cron/scripted
+  // callers regardless of UI visibility. (#1431)
   wrap.style.display = '';
   const hasCustom = Array.isArray(toolsets) && toolsets.length > 0;
   if (hasCustom) {
@@ -981,6 +988,10 @@ function _positionToolsetsDropdown() {
   const chip = $('composerToolsetsChip');
   const footer = document.querySelector('.composer-footer');
   if (!dd || !chip || !footer) return;
+  // Defense: if the chip has been hidden by responsive CSS (e.g. resize across
+  // 1100px container threshold while dropdown was open), don't try to anchor
+  // to a zero-rect element — close the dropdown instead. (#1431)
+  if (chip.offsetParent === null) { closeToolsetsDropdown(); return; }
   const chipRect = chip.getBoundingClientRect();
   const footerRect = footer.getBoundingClientRect();
   let left = chipRect.left - footerRect.left;
@@ -994,6 +1005,9 @@ function toggleToolsetsDropdown() {
   const chip = $('composerToolsetsChip');
   if (!dd || !chip) return;
   if (typeof S === 'undefined' || !S || !S.session) return;
+  // Don't open when the chip itself is hidden by responsive CSS (#1431).
+  // offsetParent === null catches display:none on the element or any ancestor.
+  if (chip.offsetParent === null) return;
   const open = dd.classList.contains('open');
   if (open) { closeToolsetsDropdown(); return; }
   if (typeof closeProfileDropdown === 'function') closeProfileDropdown();
@@ -1071,10 +1085,16 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// Position toolsets dropdown on resize
+// Position toolsets dropdown on resize, OR close it if the chip is no longer
+// visible (e.g. resize crossed the 1100px container threshold while dropdown
+// was open — the wrap is hidden by CSS but the dropdown sibling stays open
+// without an anchor). (#1431)
 window.addEventListener('resize', () => {
   const dd = $('composerToolsetsDropdown');
-  if (dd && dd.classList.contains('open')) _positionToolsetsDropdown();
+  if (!dd || !dd.classList.contains('open')) return;
+  const chip = $('composerToolsetsChip');
+  if (!chip || chip.offsetParent === null) { closeToolsetsDropdown(); return; }
+  _positionToolsetsDropdown();
 });
 
 function _syncMobileComposerConfigButton(open){
