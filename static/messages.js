@@ -283,12 +283,19 @@ function closeLiveStream(sessionId, streamId){
 function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
   if(!activeSid||!streamId) return;
   const reconnecting=!!options.reconnecting;
-  closeLiveStream(activeSid);
   if(!INFLIGHT[activeSid]) INFLIGHT[activeSid]={messages:[...S.messages],uploaded:[...uploaded],toolCalls:[]};
   else {
     if(uploaded.length) INFLIGHT[activeSid].uploaded=[...uploaded];
     if(!Array.isArray(INFLIGHT[activeSid].toolCalls)) INFLIGHT[activeSid].toolCalls=[];
   }
+  const existingLive=LIVE_STREAMS[activeSid];
+  if(
+    existingLive&&existingLive.streamId===streamId&&existingLive.source&&
+    (typeof EventSource==='undefined'||existingLive.source.readyState!==EventSource.CLOSED)
+  ){
+    return;
+  }
+  closeLiveStream(activeSid);
 
   let assistantText='';
   let reasoningText='';
