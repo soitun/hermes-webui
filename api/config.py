@@ -653,6 +653,48 @@ def _resolve_provider_alias(name: str) -> str:
     return _PROVIDER_ALIASES.get(raw, name)
 
 
+def _canonicalise_provider_id(name: object) -> str:
+    """Normalise a provider id slug into a stable lowercase-hyphenated form.
+
+    Folds underscores to hyphens and lowercases the result, so a user with
+    ``providers.opencode_go.api_key`` in ``config.yaml`` and
+    ``model.provider: opencode-go`` sees ONE provider group, not two
+    (#1568). Then attempts alias resolution but only if the alias target
+    is itself a known canonical id in ``_PROVIDER_DISPLAY`` —  this avoids
+    converting ``x-ai`` (canonical in WebUI's data structures) to ``xai``
+    (the hermes_cli alias target which the WebUI doesn't index by).
+
+    Examples::
+
+        opencode-go     -> opencode-go     (canonical, no change)
+        opencode_go     -> opencode-go     (underscore folded)
+        OpenCode-Go     -> opencode-go     (case folded)
+        OPENCODE_GO     -> opencode-go     (both folded)
+        z_ai            -> zai             (alias-resolved — zai is canonical)
+        x-ai            -> x-ai            (preserved — x-ai is canonical)
+
+    Empty input passes through as the empty string. Unknown ids preserve
+    their normalised form.
+    """
+    if not name:
+        return ""
+    raw = str(name).strip().lower().replace("_", "-")
+    if not raw:
+        return ""
+    # Already a canonical id known to _PROVIDER_DISPLAY/_PROVIDER_MODELS:
+    # keep as-is to avoid round-tripping through aliases (e.g. x-ai → xai).
+    if raw in _PROVIDER_DISPLAY or raw in _PROVIDER_MODELS:
+        return raw
+    # Try alias resolution. Only accept the result if it's itself a
+    # canonical id in _PROVIDER_DISPLAY — that prevents aliases pointing
+    # at non-canonical strings (legacy, hermes_cli-specific) from leaking
+    # in. Falls back to the normalised input otherwise.
+    resolved = _resolve_provider_alias(raw)
+    if resolved and resolved.lower() in _PROVIDER_DISPLAY:
+        return resolved.lower()
+    return raw
+
+
 # Well-known models per provider (used to populate dropdown for direct API providers)
 _PROVIDER_MODELS = {
     "anthropic": [
@@ -1976,11 +2018,21 @@ def get_available_models() -> dict:
         # Also detect providers explicitly listed in config.yaml providers section.
         # A user may configure a provider key via config.yaml providers.<name>.api_key
         # without setting the corresponding env var. (#604)
+        #
+        # Canonicalise the id slug here so a user with ``providers.opencode_go``
+        # (underscore variant) doesn't see TWO provider groups in the picker —
+        # one for the canonical ``opencode-go`` from active_provider detection
+        # and a phantom ``Opencode_Go`` group for the config-key form (#1568).
+        # The same applies to mixed-case ids like ``OpenCode-Go`` and to
+        # legitimate aliases like ``z-ai`` → ``zai``.
         _cfg_providers = cfg.get("providers", {})
         if isinstance(_cfg_providers, dict):
             for _pid_key in _cfg_providers:
-                if _pid_key in _PROVIDER_MODELS or _pid_key in cfg.get("providers", {}):
-                    detected_providers.add(_pid_key)
+                _canonical = _canonicalise_provider_id(_pid_key)
+                if not _canonical:
+                    continue
+                if _canonical in _PROVIDER_MODELS or _canonical in _cfg_providers or _pid_key in _cfg_providers:
+                    detected_providers.add(_canonical)
 
         def _normalize_base_url_for_match(value: object) -> str:
             url = str(value or "").strip().rstrip("/")
@@ -2247,9 +2299,29 @@ def get_available_models() -> dict:
                 configured_providers.add(active_provider)
             cfg_providers = cfg.get("providers", {})
             if isinstance(cfg_providers, dict):
-                configured_providers.update(cfg_providers.keys())
+                # Canonicalise here too — same rationale as #1568 detection
+                # path. Without this, only_show_configured mode could
+                # exclude detected ``opencode-go`` because configured_providers
+                # only has the underscore-variant key from config.yaml.
+                configured_providers.update(
+                    _canonicalise_provider_id(k) or k for k in cfg_providers.keys()
+                )
             # Only show providers that are both detected and configured
             detected_providers = detected_providers.intersection(configured_providers)
+
+        # Post-collection dedup: re-canonicalise every entry so any path that
+        # added a non-canonical id (mixed-case from auth-store, raw config-key,
+        # legacy alias) gets folded onto the canonical key. Belt-and-braces for
+        # #1568 — protects against future regressions in any of the ~25
+        # `detected_providers.add(...)` callsites without auditing each one.
+        # The fold is idempotent for already-canonical ids, so safe to run
+        # unconditionally.
+        if detected_providers:
+            _canonicalised_detected = set()
+            for _pid in detected_providers:
+                _c = _canonicalise_provider_id(_pid) or _pid
+                _canonicalised_detected.add(_c)
+            detected_providers = _canonicalised_detected
 
         # 5. Build model groups
         if detected_providers:
@@ -2523,33 +2595,68 @@ def get_available_models() -> dict:
                 )
 
         if default_model:
-            all_ids_norm = {_norm_model_id(m["id"]) for g in groups for m in g.get("models", [])}
-            if _norm_model_id(default_model) not in all_ids_norm:
-                label = _get_label_for_model(default_model, groups)
-                target_display = (
-                    _PROVIDER_DISPLAY.get(active_provider, active_provider or "").lower()
-                    if active_provider
-                    else ""
+            # Guard against provider-id values mistakenly stored in
+            # ``model.default``. The injection logic below puts ANY string
+            # into the picker as a fake option, so a stray provider id
+            # surfaces as a self-referential phantom model labelled e.g.
+            # ``Opencode GO`` — a 15th entry under the OpenCode Go group
+            # (#1568). The user's misconfig is real, but the picker is
+            # the wrong surface to surface it; we'd rather skip injection
+            # and emit a warning so the underlying config issue is logged.
+            _looks_like_provider_id = (
+                str(default_model).strip().lower().replace("_", "-") in _PROVIDER_DISPLAY
+                or _canonicalise_provider_id(default_model) in _PROVIDER_DISPLAY
+            )
+            if _looks_like_provider_id:
+                logger.warning(
+                    "Suspicious model.default value %r — looks like a provider id, "
+                    "not a model id. Skipping picker injection. Check `model.default` "
+                    "in config.yaml.",
+                    default_model,
                 )
-                injected = False
-                for g in groups:
-                    if target_display and g.get("provider", "").lower() == target_display:
-                        g["models"].insert(0, {"id": default_model, "label": label})
-                        injected = True
-                        break
-                if not injected and groups:
-                    groups.append(
-                        {
-                            "provider": "Default",
-                            "provider_id": active_provider or "default",
-                            "models": [{"id": default_model, "label": label}],
-                        }
+            else:
+                all_ids_norm = {_norm_model_id(m["id"]) for g in groups for m in g.get("models", [])}
+                if _norm_model_id(default_model) not in all_ids_norm:
+                    label = _get_label_for_model(default_model, groups)
+                    target_display = (
+                        _PROVIDER_DISPLAY.get(active_provider, active_provider or "").lower()
+                        if active_provider
+                        else ""
                     )
+                    injected = False
+                    for g in groups:
+                        if target_display and g.get("provider", "").lower() == target_display:
+                            g["models"].insert(0, {"id": default_model, "label": label})
+                            injected = True
+                            break
+                    if not injected and groups:
+                        groups.append(
+                            {
+                                "provider": "Default",
+                                "provider_id": active_provider or "default",
+                                "models": [{"id": default_model, "label": label}],
+                            }
+                        )
 
         # Post-process: ensure model IDs are globally unique across groups.
         # When multiple providers expose the same bare model ID, prefix
         # collisions with @provider_id: so the frontend can distinguish them.
         _deduplicate_model_ids(groups)
+
+        # Defense-in-depth: drop any optgroup that ended up with zero models
+        # — those are pure UI noise. A zero-model group typically means a
+        # detection path added an id that has no static catalog AND the
+        # live-fetch returned empty (#1568 — the user's
+        # ``providers.opencode_go`` config-key path produced an empty
+        # ``Opencode_Go`` group at the end of the picker before this fix).
+        # Custom providers from ``custom_providers`` config are exempt —
+        # they may legitimately render with zero entries when the user
+        # hasn't filled in models yet but wants the card visible.
+        groups = [
+            g for g in groups
+            if g.get("models")
+            or (g.get("provider_id") or "").startswith("custom:")
+        ]
 
         return {
             "active_provider": active_provider,
