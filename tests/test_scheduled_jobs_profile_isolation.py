@@ -36,6 +36,8 @@ def _write_jobs(home: pathlib.Path, jobs: list):
 
 def test_cron_profile_context_pins_profile_home(tmp_path, monkeypatch):
     """The context manager should swap cron.jobs to read from the named profile."""
+    pytest.importorskip("cron.jobs")  # auto-skip when hermes-agent is unavailable
+
     default_home = tmp_path / "default_home"
     meow_home = tmp_path / "default_home" / "profiles" / "meow"
 
@@ -82,6 +84,8 @@ def test_cron_profile_context_pins_profile_home(tmp_path, monkeypatch):
 
 def test_cron_profile_context_for_home_pins_explicit_home(tmp_path):
     """Thread variant: pin by explicit path (no TLS)."""
+    pytest.importorskip("cron.jobs")  # auto-skip when hermes-agent is unavailable
+
     home_a = tmp_path / "a"
     home_b = tmp_path / "b"
     _write_jobs(home_a, [{"id": "a1", "name": "A"}])
