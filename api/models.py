@@ -6,6 +6,7 @@ import os
 import threading
 import time
 import uuid
+from contextlib import closing
 from pathlib import Path
 
 import api.config as _cfg
@@ -1101,7 +1102,7 @@ def get_cli_session_messages(sid) -> list:
         return []
 
     try:
-        with sqlite3.connect(str(db_path)) as conn:
+        with closing(sqlite3.connect(str(db_path))) as conn:
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
             cur.execute("""
@@ -1142,7 +1143,7 @@ def delete_cli_session(sid) -> bool:
         return False
 
     try:
-        with sqlite3.connect(str(db_path)) as conn:
+        with closing(sqlite3.connect(str(db_path))) as conn:
             cur = conn.cursor()
             cur.execute("DELETE FROM messages WHERE session_id = ?", (sid,))
             cur.execute("DELETE FROM sessions WHERE id = ?", (sid,))

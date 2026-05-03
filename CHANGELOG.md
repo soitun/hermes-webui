@@ -1,5 +1,11 @@
 # Hermes Web UI -- Changelog
 
+## [Unreleased]
+
+### Fixed (1 PR)
+
+- **`state.db` connection FD leak in sidebar polling** (#1494, fix shape provided by @insecurejezza, closes #1494, addresses Bug #2 of #1458) — production WebUI on macOS launchd reproduced this after #1483 fixed the bootstrap supervisor double-fork: process alive, port listening, every HTTP request reset before a response. Investigation traced it to FD exhaustion from `~/.hermes/state.db` handles (366 total FDs, 238 of them `state.db*` on a wedged process). Root cause: four sqlite callsites used `with sqlite3.connect(...) as conn:`, but Python's `sqlite3.Connection` context manager only commits or rolls back on exit — it does **not** close the connection. `/api/sessions` polling calls these on every sidebar refresh, so each poll leaked one or more open `state.db` / `state.db-wal` / `state.db-shm` FDs until the process hit the macOS soft limit (256) and new connections RST'd before any handler bytes were written. **Fix:** wrap each `sqlite3.connect(...)` call in `contextlib.closing(...)` at: `api/agent_sessions.py:read_importable_agent_session_rows`, `api/agent_sessions.py:read_session_lineage_metadata`, `api/models.py:get_cli_session_messages`, `api/models.py:delete_cli_session`. The reporter verified the fix in production (FD count flat at 92 across a 100-request stress loop against `/api/sessions` and `/api/projects`, vs. monotonic growth before). 4 regression tests in `tests/test_issue1494_state_db_fd_leak.py` monkeypatch `sqlite3.connect` with a tracking wrapper that records `.close()` calls and assert every connection opened by each function is explicitly closed — verified to fail (catching the original bug) when the `closing()` wrap is reverted. Bug #3 from #1458 (HTTP-unhealthy wedge in absence of FD exhaustion) remains open pending separate diagnostic data. (`api/agent_sessions.py`, `api/models.py`, `tests/test_issue1494_state_db_fd_leak.py`)
+
 ## [v0.50.271] — 2026-05-02
 
 ### Changed (1 self-built PR)
