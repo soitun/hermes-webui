@@ -5653,6 +5653,7 @@ function _renderTreeItems(container, entries, depth){
     // Name
     const nameEl=document.createElement('span');
     nameEl.className='file-name';nameEl.textContent=item.name;nameEl.title=t('double_click_rename');
+    nameEl.onclick=(e)=>e.stopPropagation();
     nameEl.ondblclick=(e)=>{
       e.stopPropagation();
       // For directories, double-click navigates (breadcrumb view)
