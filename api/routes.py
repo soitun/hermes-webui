@@ -948,12 +948,13 @@ def _resolve_compatible_session_model_state(
         and requested_provider is None
         and default_model
     ):
-        provider_context = (
-            raw_active_provider
-            if _should_attach_codex_provider_context(default_model, raw_active_provider, catalog)
-            else None
-        )
-        return default_model, provider_context, True
+        # Persist provider_context = "openai-codex" unconditionally on this
+        # repair path so the resolved shape is stable across resolutions
+        # (Opus stage-303 SHOULD-FIX: avoid redundant repair-writes per
+        # chat-start when the catalog-coverage check fails — e.g. if a
+        # future Codex default is itself slash-prefixed). Once we've
+        # decided the session belongs to Codex, persist that decision.
+        return default_model, raw_active_provider, True
 
     # Also normalize when the model is from a known provider but the active provider
     # is an unlisted one (e.g. ollama-cloud) — active_provider is "" in that case
