@@ -120,6 +120,7 @@ var S = {
     model: args.sessionModel,
     model_provider: args.sessionProvider || null,
     messages: [],
+    _modelResolutionDeferred: !!args.modelResolutionDeferred,
   },
   messages: [],
   activeProfile: 'default',
@@ -143,7 +144,7 @@ def driver_path(tmp_path_factory):
     return str(p)
 
 
-def _run_sync(driver_path, *, session_model, initial_value="@expensive:gpt-5.5", default_model="@safe:gpt-4o-mini", dropdown_open=False):
+def _run_sync(driver_path, *, session_model, initial_value="@expensive:gpt-5.5", default_model="@safe:gpt-4o-mini", dropdown_open=False, model_resolution_deferred=False):
     payload = {
         "sessionModel": session_model,
         "sessionProvider": None,
@@ -151,6 +152,7 @@ def _run_sync(driver_path, *, session_model, initial_value="@expensive:gpt-5.5",
         "defaultModel": default_model,
         "activeProvider": "safe",
         "dropdownOpen": dropdown_open,
+        "modelResolutionDeferred": model_resolution_deferred,
         "options": [
             {"provider": "expensive", "value": "@expensive:gpt-5.5", "label": "GPT-5.5"},
             {"provider": "safe", "value": "@safe:gpt-4o-mini", "label": "GPT-4o mini"},
@@ -190,3 +192,30 @@ def test_sync_topbar_rerenders_open_visible_model_dropdown_after_session_model_c
     assert got["selectValue"] == "@safe:gpt-4o-mini"
     assert got["calls"]["renderModelDropdown"] >= 1
     assert got["calls"]["positionModelDropdown"] >= 1
+
+
+
+def test_sync_topbar_does_not_persist_correction_while_model_resolution_deferred(driver_path):
+    """Regression for stage-310 Opus review: the !hasSessionModel branch must
+    skip the network write + state mutation while sessions.js has set
+    _modelResolutionDeferred=true between the fast-path session render and
+    the resolve_model=1 round-trip.
+
+    Without this guard, every fast-path session view of an empty/unknown-model
+    session fires a /api/session/update POST that races _resolveSessionModelForDisplaySoon
+    and thrashes imported/read-only CLI sessions whose model field reads "unknown"
+    (#1778 introduced exactly that surface in v0.51.16).
+    """
+    got_empty = _run_sync(driver_path, session_model="", model_resolution_deferred=True)
+    # Visible UX still happens (sel.value gets the safe default) ...
+    assert got_empty["selectValue"] == "@safe:gpt-4o-mini"
+    # ... but session state is NOT mutated and NO POST is issued.
+    assert got_empty["sessionModel"] == "", "S.session.model must not be mutated while resolution is deferred"
+    update_calls = [c for c in got_empty["calls"]["fetches"] if "session" in c["url"] and "update" in c["url"]]
+    assert update_calls == [], f"no /api/session/update POSTs while deferred (got {update_calls})"
+
+    got_unknown = _run_sync(driver_path, session_model="unknown", model_resolution_deferred=True)
+    assert got_unknown["selectValue"] == "@safe:gpt-4o-mini"
+    assert got_unknown["sessionModel"] == "unknown"
+    update_calls_u = [c for c in got_unknown["calls"]["fetches"] if "session" in c["url"] and "update" in c["url"]]
+    assert update_calls_u == [], "imported/read-only CLI session with model=unknown must not be silently written"

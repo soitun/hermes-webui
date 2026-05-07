@@ -3711,10 +3711,21 @@ function syncTopbar(){
       // first, then the first available option only as an HTML fallback.
       const fallback=_applySessionModelFallback(modelSel);
       if(fallback){
-        S.session.model=fallback.model;
-        S.session.model_provider=fallback.model_provider||null;
-        currentModel=fallback.model;
-        _persistSessionModelCorrection(fallback.model,S.session.model_provider||null);
+        // Defer state mutation + network write while the live model resolution
+        // is in flight — sessions.js sets _modelResolutionDeferred=true between
+        // the fast-path session render and the resolve_model=1 round-trip.
+        // Persisting here would race that resolution and would also issue
+        // silent /api/session/update POSTs against imported/read-only CLI
+        // sessions whose model field reads "unknown" (#1779 stage-310 review).
+        // The visible sel.value change still happens above for UX; only the
+        // state mutation + persist defers.
+        const deferModelCorrection=Boolean(S.session._modelResolutionDeferred);
+        if(!deferModelCorrection){
+          S.session.model=fallback.model;
+          S.session.model_provider=fallback.model_provider||null;
+          currentModel=fallback.model;
+          _persistSessionModelCorrection(fallback.model,S.session.model_provider||null);
+        }
       }
     } else {
       const applied=_applyModelToDropdown(currentModel,modelSel,S.session.model_provider||null);
