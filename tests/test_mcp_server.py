@@ -26,6 +26,24 @@ if str(_REPO) not in sys.path:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+#  State-restore bookkeeping
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# These tests mutate module-level constants on api.config / mcp_server /
+# api.models (STATE_DIR, SESSION_DIR, PROJECTS_FILE, …) so the MCP server
+# reads from a tmpdir. Without restoration, downstream tests in the full
+# suite (test_pytest_state_isolation, test_provider_quota_status,
+# test_provider_management, etc.) read the now-deleted tmpdir from
+# api.config.STATE_DIR and fail.
+#
+# We snapshot the original values on first _reimport_mcp() call and restore
+# them in _cleanup_state_dir() so the post-test module state matches pre-test.
+
+_MISSING_ENV = object()
+_SAVED_CONSTANTS = {"captured": False}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 #  Helpers
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -41,12 +59,39 @@ def _fresh_state_dir():
     return state_dir
 
 
+
 def _cleanup_state_dir(state_dir: Path):
-    """Remove temp state dir and clear env var."""
+    """Remove temp state dir, clear env var, and restore api.config/mcp_server
+    module constants to whatever they were before the fixture started.
+
+    Without restoring, subsequent tests (test_pytest_state_isolation,
+    test_provider_quota_status, test_provider_management, etc.) read the
+    fixture's tmpdir from `api.config.STATE_DIR` and fail because the path
+    no longer exists or doesn't match their pytest-managed state dir."""
     import shutil
     shutil.rmtree(state_dir, ignore_errors=True)
     os.environ.pop("HERMES_WEBUI_STATE_DIR", None)
 
+    # Restore api.config / mcp_server / api.models module constants.
+    saved = _SAVED_CONSTANTS
+    if saved.get("captured"):
+        import api.config as _cfg
+        for attr, val in saved["api.config"].items():
+            setattr(_cfg, attr, val)
+        if "mcp_server" in sys.modules:
+            mcp_mod = sys.modules["mcp_server"]
+            for attr, val in saved["mcp_server"].items():
+                setattr(mcp_mod, attr, val)
+        if "api.models" in sys.modules:
+            models_mod = sys.modules["api.models"]
+            for attr, val in saved["api.models"].items():
+                setattr(models_mod, attr, val)
+        # Restore HERMES_BASE_HOME / HERMES_HOME if we changed them
+        for env_key, env_val in saved["env"].items():
+            if env_val is _MISSING_ENV:
+                os.environ.pop(env_key, None)
+            else:
+                os.environ[env_key] = env_val
 
 def _reimport_mcp():
     """Re-point mcp_server's module-level STATE_DIR / SESSION_DIR /
@@ -65,12 +110,97 @@ def _reimport_mcp():
     behaviorally equivalent for these tests since the constants are
     module-level Path objects used only to compute STATE_DIR-rooted
     paths at call time.
+
+    Also normalizes HERMES_BASE_HOME / HERMES_HOME to point at a
+    directory whose `profiles/` subdirectory we control. This isolates
+    us from sibling test files (e.g. test_profile_path_security.py)
+    that mutate those env vars during their own setup and don't restore
+    them in the strict sense the active-profile path resolution needs.
     """
     state_dir = Path(os.environ['HERMES_WEBUI_STATE_DIR'])
 
+    # Sibling test files (e.g. test_profile_path_security.py) mutate
+    # HERMES_BASE_HOME / HERMES_HOME but only restore sys.modules — the
+    # env vars stay pointing at their tmpdir, which then breaks our
+    # active-profile path resolution. Re-anchor at a local home dir
+    # under our state_dir so other-profile scoping works.
+    isolated_home = state_dir.parent / "hermes-home"
+    (isolated_home / "profiles").mkdir(parents=True, exist_ok=True)
+
+    # Snapshot env vars BEFORE we overwrite them, so _cleanup_state_dir
+    # can restore them at fixture exit.
+    if not _SAVED_CONSTANTS.get("captured"):
+        _SAVED_CONSTANTS["env"] = {
+            "HERMES_BASE_HOME": os.environ.get("HERMES_BASE_HOME", _MISSING_ENV),
+            "HERMES_HOME": os.environ.get("HERMES_HOME", _MISSING_ENV),
+        }
+
+    os.environ["HERMES_BASE_HOME"] = str(isolated_home)
+    os.environ["HERMES_HOME"] = str(isolated_home)
+
     import api.config as cfg
-    import api.profiles as fresh_profiles
     import mcp_server as mod
+
+    # First-time snapshot of module constants — captured AFTER the imports
+    # land their original values but BEFORE we mutate them below.
+    if not _SAVED_CONSTANTS.get("captured"):
+        _SAVED_CONSTANTS["api.config"] = {
+            attr: getattr(cfg, attr)
+            for attr in ("STATE_DIR", "SESSION_DIR", "WORKSPACES_FILE",
+                         "SETTINGS_FILE", "LAST_WORKSPACE_FILE", "PROJECTS_FILE",
+                         "SESSION_INDEX_FILE")
+            if hasattr(cfg, attr)
+        }
+        _SAVED_CONSTANTS["mcp_server"] = {
+            attr: getattr(mod, attr)
+            for attr in ("STATE_DIR", "SESSION_DIR", "PROJECTS_FILE",
+                         "SESSION_INDEX_FILE", "WEBUI_HOST", "WEBUI_PORT",
+                         "WEBUI_URL")
+            if hasattr(mod, attr)
+        }
+        if "api.models" in sys.modules:
+            models_mod = sys.modules["api.models"]
+            _SAVED_CONSTANTS["api.models"] = {
+                attr: getattr(models_mod, attr)
+                for attr in ("STATE_DIR", "PROJECTS_FILE", "SESSION_DIR")
+                if hasattr(models_mod, attr)
+            }
+        else:
+            _SAVED_CONSTANTS["api.models"] = {}
+        _SAVED_CONSTANTS["captured"] = True
+
+    # Acquire the api.profiles module THAT mcp_server's bound functions read.
+    # Sibling tests (test_profile_path_security.py) deletes api.profiles from
+    # sys.modules during their setup, then restores the originally-saved
+    # module reference. The result is that `import api.profiles` returns
+    # whatever module is currently in sys.modules, which may NOT be the same
+    # object as `mcp_server.get_active_profile_name`'s closure reference.
+    # We need to mutate the closure-bound module so mcp_server sees our
+    # _active_profile assignment.
+    import api.profiles as fresh_profiles_via_import
+    # mcp_server.get_active_profile_name is bound at first-import time and
+    # reads `_active_profile` from its own module's globals via closure.
+    # That module is the function's __globals__["__name__"] entry in
+    # sys.modules at first-import time. The most reliable way to find it
+    # is to follow the bound function back to its module.
+    bound_get_active = mod.get_active_profile_name
+    bound_module_name = bound_get_active.__module__
+    # Grab whatever Python currently has registered for that name; it may
+    # or may not be the same object as fresh_profiles_via_import.
+    # Use the function's __globals__ directly — that's the actual closure
+    # the function uses for its module-level reads.
+    bound_globals = bound_get_active.__globals__
+    # bound_globals IS the dict from sys.modules[<api.profiles>].__dict__ at
+    # first-import time. Mutating it propagates to all bound functions.
+    fresh_profiles = sys.modules.get(bound_module_name)
+    if fresh_profiles is None or fresh_profiles.__dict__ is not bound_globals:
+        # Sibling tests left a different module in sys.modules. The bound
+        # functions still use the original globals dict, so we expose a
+        # ModuleType-like proxy that writes to the original dict.
+        class _ProxyModule:
+            def __init__(self, globs):
+                self.__dict__ = globs
+        fresh_profiles = _ProxyModule(bound_globals)
 
     # Re-point api.config module-level constants
     cfg.STATE_DIR = state_dir
@@ -110,6 +240,17 @@ def _reimport_mcp():
     mod.WEBUI_URL = f"http://{mod.WEBUI_HOST}:{mod.WEBUI_PORT}"
 
     fresh_profiles._active_profile = 'default'
+
+    # Invalidate the root-profile cache (set at module load to detect
+    # renamed-root profiles, but stale after sibling tests that called
+    # switch_profile / list_profiles_api in their own setup).
+    if hasattr(fresh_profiles, '_invalidate_root_profile_cache'):
+        fresh_profiles._invalidate_root_profile_cache()
+    elif hasattr(fresh_profiles, '_root_profile_name_cache'):
+        fresh_profiles._root_profile_name_cache.clear()
+        fresh_profiles._root_profile_name_cache.add('default')
+        if hasattr(fresh_profiles, '_root_profile_name_cache_loaded'):
+            fresh_profiles._root_profile_name_cache_loaded = False
     return mod, fresh_profiles
 
 
@@ -491,16 +632,48 @@ async def test_profiles_match_single_source_of_truth():
     Imported here in a clean module-import context (not via _reimport_mcp,
     which would re-execute api/profiles.py and produce a distinct function
     object that's behaviorally identical but fails the `is` check).
+
+    NOTE: We swap-in fresh modules but RESTORE the originals at exit so
+    sibling test files (test_provider_quota_status etc.) that imported
+    api.profiles at module-load time continue to see the same object
+    they already have monkeypatch handles into. Otherwise their
+    `monkeypatch.setattr(profiles, ...)` patches the wrong module object.
     """
-    # Make sure no test fixture left a re-import side-effect on these modules.
+    # Snapshot the originals; we'll put them back at the end.
+    saved_modules = {
+        k: sys.modules[k]
+        for k in ('mcp_server', 'api.routes', 'api.profiles')
+        if k in sys.modules
+    }
+    # Also snapshot the attributes on the parent `api` package, because
+    # `import api.routes as r` resolves via `sys.modules['api'].routes`,
+    # NOT directly via sys.modules['api.routes']. If we don't restore
+    # the parent attribute, subsequent `import api.routes as r` calls
+    # bind to the fresh re-imported module even though sys.modules
+    # holds the original.
+    import api as _api_parent
+    saved_api_attrs = {}
+    for sub in ('routes', 'profiles'):
+        if hasattr(_api_parent, sub):
+            saved_api_attrs[sub] = getattr(_api_parent, sub)
+
     for k in ('mcp_server', 'api.routes', 'api.profiles'):
         sys.modules.pop(k, None)
-    import api.profiles as _profiles_mod
-    import api.routes as _routes_mod
-    import mcp_server as _mcp_mod
-    canonical = _profiles_mod._profiles_match
-    assert _routes_mod._profiles_match is canonical
-    assert _mcp_mod._profiles_match is canonical
+    try:
+        import api.profiles as _profiles_mod
+        import api.routes as _routes_mod
+        import mcp_server as _mcp_mod
+        canonical = _profiles_mod._profiles_match
+        assert _routes_mod._profiles_match is canonical
+        assert _mcp_mod._profiles_match is canonical
+    finally:
+        # Restore so monkeypatch handles in sibling tests target the right module.
+        for k in ('mcp_server', 'api.routes', 'api.profiles'):
+            sys.modules.pop(k, None)
+        sys.modules.update(saved_modules)
+        # Restore parent-package attributes too (see above for why).
+        for sub, mod_obj in saved_api_attrs.items():
+            setattr(_api_parent, sub, mod_obj)
 
 
 @pytest.mark.parametrize("a, b", [
