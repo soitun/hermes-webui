@@ -2044,7 +2044,7 @@ def _run_agent_streaming(
             if _metering_stop.wait(interval):
                 break  # stream was cancelled or ended — exit
             stats = meter().get_stats()
-            stats['session_id'] = stream_id
+            stats['session_id'] = session_id
             stats['usage'] = _live_usage_snapshot()
             put('metering', stats)
 
@@ -2241,7 +2241,8 @@ def _run_agent_streaming(
                     return
                 _metering_last_emit[0] = now
                 stats = meter().get_stats()
-                stats['session_id'] = stream_id
+                stats['session_id'] = session_id
+                stats['usage'] = _live_usage_snapshot()
                 stats.setdefault('tps_available', False)
                 stats.setdefault('estimated', False)
                 put('metering', stats)
@@ -2377,7 +2378,7 @@ def _run_agent_streaming(
                         'args': args_snap,
                     })
                     _tool_stats = meter().get_stats()
-                    _tool_stats['session_id'] = stream_id
+                    _tool_stats['session_id'] = session_id
                     _tool_stats['usage'] = _live_usage_snapshot()
                     put('metering', _tool_stats)
                     # Fallback: poll for pending approval in case notify_cb wasn't
@@ -2424,7 +2425,7 @@ def _run_agent_streaming(
                         'is_error': bool(cb_kwargs.get('is_error', False)),
                     })
                     _tool_stats = meter().get_stats()
-                    _tool_stats['session_id'] = stream_id
+                    _tool_stats['session_id'] = session_id
                     _tool_stats['usage'] = _live_usage_snapshot()
                     put('metering', _tool_stats)
                     return
@@ -2433,7 +2434,7 @@ def _run_agent_streaming(
                 try:
                     _record_live_tool_start(tool_call_id, name, args)
                     _tool_stats = meter().get_stats()
-                    _tool_stats['session_id'] = stream_id
+                    _tool_stats['session_id'] = session_id
                     _tool_stats['usage'] = _live_usage_snapshot()
                     put('metering', _tool_stats)
                 except Exception:
@@ -2443,7 +2444,7 @@ def _run_agent_streaming(
                 try:
                     _record_live_tool_complete(tool_call_id, name, function_result)
                     _tool_stats = meter().get_stats()
-                    _tool_stats['session_id'] = stream_id
+                    _tool_stats['session_id'] = session_id
                     _tool_stats['usage'] = _live_usage_snapshot()
                     put('metering', _tool_stats)
                 except Exception:
@@ -2699,6 +2700,10 @@ def _run_agent_streaming(
                     # objects (put queue, cancel_event) that are new each request.
                     agent.stream_delta_callback = _agent_kwargs.get('stream_delta_callback')
                     agent.tool_progress_callback = _agent_kwargs.get('tool_progress_callback')
+                    if hasattr(agent, 'tool_start_callback'):
+                        agent.tool_start_callback = _agent_kwargs.get('tool_start_callback')
+                    if hasattr(agent, 'tool_complete_callback'):
+                        agent.tool_complete_callback = _agent_kwargs.get('tool_complete_callback')
                     if hasattr(agent, 'status_callback'):
                         agent.status_callback = _agent_kwargs.get('status_callback')
                     if hasattr(agent, 'interim_assistant_callback'):
