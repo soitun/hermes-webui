@@ -4242,6 +4242,7 @@ def handle_post(handler, parsed) -> bool:
             title=branch_title,
             messages=forked_messages,
             parent_session_id=source.session_id,
+            session_source="fork",
         )
         with LOCK:
             SESSIONS[branch.session_id] = branch
