@@ -2516,45 +2516,6 @@ def get_available_models() -> dict:
                         }
                     )
 
-            # Also badge explicitly configured providers (from config.yaml
-            # providers section) so they appear at the top of the dropdown.
-            _cfg_providers = cfg.get("providers", {}) or {}
-            if isinstance(_cfg_providers, dict):
-                for _cpid, _cpcfg in _cfg_providers.items():
-                    _canonical_pid = _canonicalise_provider_id(_cpid)
-                    if not _canonical_pid:
-                        continue
-                    # Skip providers already covered by primary/fallback entries
-                    _already_badged = any(
-                        e["provider"] == _canonical_pid for e in configured_entries
-                    )
-                    if _already_badged:
-                        continue
-                    # Only badge providers that have models in the groups list
-                    _group = next(
-                        (g for g in groups
-                         if (g.get("provider_id") or "").lower() == _canonical_pid.lower()),
-                        None,
-                    )
-                    if not _group:
-                        continue
-                    # Add all models from this provider as configured entries
-                    for _m in _group.get("models", []):
-                        _mid = (_m.get("id") or "").strip()
-                        _mlabel = (_m.get("label") or _mid).strip()
-                        if not _mid:
-                            continue
-                        # Strip @provider: prefix for the model name lookup
-                        _bare_model = _mid.split(":", 1)[-1] if ":" in _mid else _mid
-                        configured_entries.append(
-                            {
-                                "provider": _canonical_pid,
-                                "model": _bare_model,
-                                "role": "configured",
-                                "label": "Configured",
-                            }
-                        )
-
             option_ids = [m.get("id", "") for g in groups for m in g.get("models", []) if m.get("id")]
             option_lookup = {str(opt_id): str(opt_id) for opt_id in option_ids}
             option_provider_lookup = {
