@@ -12,6 +12,7 @@ let _kanbanLanesByProfile = false;
 let _kanbanCurrentBoard = null;
 let _kanbanBoardsList = null;
 let _kanbanBoardMenuOpen = false;
+let _kanbanIsDispatching = false;
 // SSE event stream — replaces the 30s polling cadence with a long-lived
 // /api/kanban/events/stream connection. Falls back to polling when the
 // EventSource fails to connect (proxy that strips text/event-stream, etc).
@@ -1424,11 +1425,14 @@ function _kanbanBoardQuery(extra){
 }
 
 async function nudgeKanbanDispatcher(){
+  if (_kanbanIsDispatching) return;
   // Dry-run dispatch: show what WOULD be spawned, without actually spawning
   // workers.  Uses ?dry_run=1 so the dispatcher reports its plan without
   // mutating the board.  The result shape includes spawned/skipped_unassigned/
   // skipped_nonspawnable/promoted/auto_blocked so users can diagnose why a
   // Ready task isn't being picked up before they commit to a real run.
+  _kanbanIsDispatching = true;
+  _setKanbanDispatcherButtonsDisabled(true);
   try {
     const dispatchEndpoint = '/api/kanban/dispatch';
     const result = await api(
@@ -1437,10 +1441,16 @@ async function nudgeKanbanDispatcher(){
     );
     showToast(_kanbanFormatDispatchResult(result, true), 'info', 6000);
     await loadKanban(true);
-  } catch(e) { showToast(t('kanban_unavailable') + ': ' + (e.message || e), 'error'); }
+  } catch(e) {
+    showToast(t('kanban_unavailable') + ': ' + (e.message || e), 'error');
+  } finally {
+    _kanbanIsDispatching = false;
+    _setKanbanDispatcherButtonsDisabled(false);
+  }
 }
 
 async function runKanbanDispatcher(){
+  if (_kanbanIsDispatching) return;
   // Real dispatch: claims Ready tasks and spawns worker subprocesses
   // (one `hermes -p <assignee>` per claimed row, up to max=8 per call).
   // Confirmation dialog first because this actually consumes API budget on
@@ -1450,14 +1460,17 @@ async function runKanbanDispatcher(){
     showToast(t('kanban_unavailable') || 'Kanban unavailable', 'error');
     return;
   }
-  const ok = await showConfirmDialog({
-    title: t('kanban_run_dispatcher') || 'Run dispatcher',
-    message: t('kanban_run_dispatcher_confirm')
-      || 'This will claim Ready tasks on this board and spawn worker subprocesses (one per task, up to 8 per click). Continue?',
-    confirmLabel: t('kanban_run_dispatcher') || 'Run dispatcher',
-  });
-  if (!ok) return;
+
+  _kanbanIsDispatching = true;
+  _setKanbanDispatcherButtonsDisabled(true);
   try {
+    const ok = await showConfirmDialog({
+      title: t('kanban_run_dispatcher') || 'Run dispatcher',
+      message: t('kanban_run_dispatcher_confirm')
+        || 'This will claim Ready tasks on this board and spawn worker subprocesses (one per task, up to 8 per click). Continue?',
+      confirmLabel: t('kanban_run_dispatcher') || 'Run dispatcher',
+    });
+    if (!ok) return;
     const dispatchEndpoint = '/api/kanban/dispatch';
     const result = await api(
       dispatchEndpoint + '?max=8' + (_kanbanCurrentBoard ? '&board=' + encodeURIComponent(_kanbanCurrentBoard) : ''),
@@ -1465,7 +1478,19 @@ async function runKanbanDispatcher(){
     );
     showToast(_kanbanFormatDispatchResult(result, false), 'info', 8000);
     await loadKanban(true);
-  } catch(e) { showToast(t('kanban_unavailable') + ': ' + (e.message || e), 'error'); }
+  } catch(e) {
+    showToast(t('kanban_unavailable') + ': ' + (e.message || e), 'error');
+  } finally {
+    _kanbanIsDispatching = false;
+    _setKanbanDispatcherButtonsDisabled(false);
+  }
+}
+
+function _setKanbanDispatcherButtonsDisabled(disabled){
+  document.querySelectorAll('.kanban-run-dispatch-btn, .kanban-nudge-dispatch-btn').forEach((btn) => {
+    btn.disabled = !!disabled;
+    btn.classList.toggle('disabled', !!disabled);
+  });
 }
 
 function _kanbanFormatDispatchResult(result, dryRun){

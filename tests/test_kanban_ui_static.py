@@ -413,6 +413,38 @@ def test_kanban_run_dispatcher_button_exists_and_is_distinct_from_preview():
         assert token in fmt_body, f"dispatch summary missing field: {token}"
 
 
+def test_kanban_dispatcher_inflight_guard_prevents_double_click_toast_confusion():
+    """Guard against concurrent dispatch invocations in both nudge and real run paths."""
+    assert "let _kanbanIsDispatching = false;" in PANELS
+    assert "function _setKanbanDispatcherButtonsDisabled" in PANELS
+
+    run_match = re.search(r"async function runKanbanDispatcher\(\)\{(.*?)\n\}", PANELS, re.DOTALL)
+    assert run_match, "runKanbanDispatcher() not found"
+    run_body = run_match.group(1)
+    assert "_kanbanIsDispatching" in run_body, (
+        "runKanbanDispatcher() must check or set _kanbanIsDispatching to block concurrent execution."
+    )
+    assert "finally" in run_body, "runKanbanDispatcher() must always clear _kanbanIsDispatching in finally."
+    assert "_setKanbanDispatcherButtonsDisabled(true)" in run_body, (
+        "runKanbanDispatcher() should disable both dispatcher buttons while posting."
+    )
+    assert "_setKanbanDispatcherButtonsDisabled(false)" in run_body, (
+        "runKanbanDispatcher() should re-enable dispatcher buttons when done."
+    )
+
+    nudge_match = re.search(r"async function nudgeKanbanDispatcher\(\)\{(.*?)\n\}", PANELS, re.DOTALL)
+    assert nudge_match, "nudgeKanbanDispatcher() not found"
+    nudge_body = nudge_match.group(1)
+    assert "_kanbanIsDispatching" in nudge_body, (
+        "nudgeKanbanDispatcher() should also respect the dispatch in-flight guard."
+    )
+    assert "finally" in nudge_body, "nudgeKanbanDispatcher() should always clear guard in finally."
+
+    assert 'kanban-run-dispatch-btn' in INDEX
+    assert 'kanban-nudge-dispatch-btn' in INDEX
+    assert 'btnKanbanRunDispatcher' in INDEX
+    assert 'btnKanbanPreviewDispatcher' in INDEX
+
 
 def test_kanban_board_has_native_css_classes():
     for selector in (
