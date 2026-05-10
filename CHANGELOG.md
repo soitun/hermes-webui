@@ -1,5 +1,11 @@
 # Hermes Web UI -- Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **bug(cron): clarify one-shot schedule deletion semantics** ([#2031](https://github.com/nesquena/hermes-webui/issues/2031)). The Scheduled Jobs form now makes the Hermes Agent cron contract visible: recurring jobs should use `every 30m` or a cron expression, while bare durations/dates such as `30m`, `2h`, or `2026-05-11T08:00` create one-shot jobs that are removed after they run. Adds a live warning under the Schedule input when the entered value matches the one-shot forms.
+
 ## [v0.51.39] — 2026-05-10 — Release O (4-PR contributor batch — Railway docker fix + Stop-button race + provider resolver + live context tracking)
 
 ### Fixed
