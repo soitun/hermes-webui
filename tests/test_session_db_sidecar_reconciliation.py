@@ -67,3 +67,61 @@ def test_audit_reports_state_db_row_missing_sidecar(tmp_path):
         and item["recommendation"] == "materialize_from_state_db"
         for item in report["items"]
     )
+
+
+def test_materialized_sidecar_round_trips_through_session_load(tmp_path, monkeypatch):
+    """Schema parity guard: a materialized sidecar must be readable by Session.load
+    and the resulting Session must have the same messages we put in state.db.
+
+    Catches future schema drift where the hardcoded 35-key dict in
+    _state_db_row_to_sidecar() falls out of sync with what Session.__init__
+    expects. See Opus review on PR #2041 for context.
+    """
+    import api.models as _m
+
+    sid = _make_state_db(tmp_path / "state.db", sid="rt_001", messages=3)
+
+    monkeypatch.setattr(_m, "SESSION_DIR", tmp_path)
+
+    result = recover_missing_sidecars_from_state_db(tmp_path, tmp_path / "state.db")
+    assert result["materialized"] == 1
+
+    loaded = _m.Session.load(sid)
+    assert loaded is not None, "Session.load returned None for materialized sidecar"
+    assert loaded.session_id == sid
+    assert len(loaded.messages) == 3
+    assert [m["content"] for m in loaded.messages] == [
+        "message 1",
+        "message 2",
+        "message 3",
+    ]
+    assert loaded.model == "openai/gpt-5"
+    assert loaded.parent_session_id == "parent-1"
+
+
+def test_recover_missing_sidecars_uses_per_process_tmp_suffix(tmp_path):
+    """The tmp filename used during reconciliation must include pid/tid so
+    concurrent calls cannot corrupt each other's writes. See Opus review on
+    PR #2041 (matches Session.save() pattern at api/models.py:484).
+    """
+    import os
+    import threading
+
+    _make_state_db(tmp_path / "state.db", sid="tmp_suffix_001", messages=1)
+
+    # Snapshot the directory before, run reconciliation, then check no
+    # generic ".json.reconcile.tmp" residue exists — it must have a
+    # pid.tid suffix and be cleaned up after.
+    result = recover_missing_sidecars_from_state_db(tmp_path, tmp_path / "state.db")
+    assert result["materialized"] == 1
+
+    # No leftover tmp files
+    leftover = list(tmp_path.glob("*.reconcile.tmp*"))
+    assert leftover == [], f"Reconciliation left tmp residue: {leftover}"
+
+    # And the source explicitly references pid + tid in the suffix
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent / "api" / "session_recovery.py").read_text(encoding="utf-8")
+    assert "os.getpid()" in src and "threading.current_thread().ident" in src, (
+        ".reconcile.tmp suffix must include pid + tid for concurrency safety"
+    )

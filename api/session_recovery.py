@@ -28,8 +28,10 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import shutil
 import sqlite3
+import threading
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -303,10 +305,13 @@ def recover_missing_sidecars_from_state_db(session_dir: Path, state_db_path: Pat
         if target.exists():
             continue
         payload = _state_db_row_to_sidecar(row)
-        tmp = target.with_suffix('.json.reconcile.tmp')
+        # Per-process/per-thread tmp suffix to avoid corruption under
+        # concurrent reconciliation calls (matches api/models.py:484
+        # Session.save() convention).
+        tmp_suffix = f".json.reconcile.tmp.{os.getpid()}.{threading.current_thread().ident}"
+        tmp = target.with_suffix(tmp_suffix)
         try:
             tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
-            tmp.replace(target)
         except OSError as exc:
             try:
                 tmp.unlink(missing_ok=True)
@@ -314,8 +319,29 @@ def recover_missing_sidecars_from_state_db(session_dir: Path, state_db_path: Pat
                 pass
             details.append({'session_id': sid, 'materialized': False, 'error': str(exc)})
             continue
-        materialized += 1
-        details.append({'session_id': sid, 'materialized': True, 'messages': len(payload.get('messages') or [])})
+        # Atomic create-or-fail: os.link() refuses to overwrite an existing
+        # target. Closes the TOCTOU window between the target.exists() check
+        # above and the rename — a concurrent Session.save() for the same SID
+        # will win and we silently skip rather than overwrite a live sidecar.
+        materialized_now = False
+        try:
+            os.link(str(tmp), str(target))
+            materialized_now = True
+        except FileExistsError:
+            # Live sidecar appeared between the check and the link — keep it.
+            pass
+        except OSError as exc:
+            details.append({'session_id': sid, 'materialized': False, 'error': str(exc)})
+        finally:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+        if materialized_now:
+            materialized += 1
+            details.append({'session_id': sid, 'materialized': True, 'messages': len(payload.get('messages') or [])})
+        elif not any(d.get('session_id') == sid for d in details[-1:]):
+            details.append({'session_id': sid, 'materialized': False, 'skipped': 'sidecar_appeared_during_reconcile'})
     return {'scanned': len(rows), 'materialized': materialized, 'details': details}
 
 
