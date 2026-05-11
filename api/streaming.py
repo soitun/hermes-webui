@@ -34,6 +34,7 @@ from api.config import (
 )
 from api.helpers import redact_session_data, _redact_text
 from api.metering import meter
+from api.turn_journal import append_turn_journal_event_for_stream
 
 # Global lock for os.environ writes. Per-session locks (_agent_lock) prevent
 # concurrent runs of the SAME session, but two DIFFERENT sessions can still
@@ -2053,6 +2054,15 @@ def _run_agent_streaming(
         provider=model_provider,
         ephemeral=bool(ephemeral),
     )
+    if not ephemeral:
+        try:
+            append_turn_journal_event_for_stream(
+                session_id,
+                stream_id,
+                {"event": "worker_started", "created_at": time.time()},
+            )
+        except Exception:
+            logger.debug("Failed to append worker_started turn journal event", exc_info=True)
     s = None
     _rt = {}
     old_cwd = None
@@ -3559,7 +3569,40 @@ def _run_agent_streaming(
                         # Older hermes-agent builds may not expose this helper.
                         # Better to leave context_length=0 than crash the save.
                         pass
+                if not ephemeral and s.messages:
+                    for _idx, _msg in enumerate(s.messages):
+                        if isinstance(_msg, dict) and _msg.get('role') == 'assistant':
+                            try:
+                                append_turn_journal_event_for_stream(
+                                    s.session_id,
+                                    stream_id,
+                                    {
+                                        "event": "assistant_started",
+                                        "created_at": float(_msg.get('timestamp') or time.time()),
+                                        "assistant_message_index": _idx,
+                                    },
+                                )
+                            except Exception:
+                                logger.debug("Failed to append assistant_started turn journal event", exc_info=True)
+                            break
                 s.save()
+                if not ephemeral:
+                    try:
+                        append_turn_journal_event_for_stream(
+                            s.session_id,
+                            stream_id,
+                            {
+                                "event": "completed",
+                                "created_at": time.time(),
+                                "assistant_message_index": next(
+                                    (idx for idx in range(len(s.messages) - 1, -1, -1)
+                                     if isinstance(s.messages[idx], dict) and s.messages[idx].get('role') == 'assistant'),
+                                    None,
+                                ),
+                            },
+                        )
+                    except Exception:
+                        logger.debug("Failed to append completed turn journal event", exc_info=True)
             # Sync to state.db for /insights (opt-in setting)
             try:
                 from api.config import load_settings as _load_settings
@@ -3929,6 +3972,19 @@ def _run_agent_streaming(
                     s.save()
                 except Exception:
                     pass
+                if not ephemeral:
+                    try:
+                        append_turn_journal_event_for_stream(
+                            s.session_id,
+                            stream_id,
+                            {
+                                "event": "interrupted",
+                                "created_at": time.time(),
+                                "reason": _exc_type,
+                            },
+                        )
+                    except Exception:
+                        logger.debug("Failed to append interrupted turn journal event", exc_info=True)
         put('apperror', _error_payload)
     finally:
         # Stop the periodic checkpoint thread before the final recovery path.
