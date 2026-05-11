@@ -3570,21 +3570,25 @@ def _run_agent_streaming(
                         # Better to leave context_length=0 than crash the save.
                         pass
                 if not ephemeral and s.messages:
-                    for _idx, _msg in enumerate(s.messages):
-                        if isinstance(_msg, dict) and _msg.get('role') == 'assistant':
-                            try:
-                                append_turn_journal_event_for_stream(
-                                    s.session_id,
-                                    stream_id,
-                                    {
-                                        "event": "assistant_started",
-                                        "created_at": float(_msg.get('timestamp') or time.time()),
-                                        "assistant_message_index": _idx,
-                                    },
-                                )
-                            except Exception:
-                                logger.debug("Failed to append assistant_started turn journal event", exc_info=True)
-                            break
+                    _latest_assistant_idx = next(
+                        (idx for idx in range(len(s.messages) - 1, -1, -1)
+                         if isinstance(s.messages[idx], dict) and s.messages[idx].get('role') == 'assistant'),
+                        None,
+                    )
+                    if _latest_assistant_idx is not None:
+                        _latest_assistant = s.messages[_latest_assistant_idx]
+                        try:
+                            append_turn_journal_event_for_stream(
+                                s.session_id,
+                                stream_id,
+                                {
+                                    "event": "assistant_started",
+                                    "created_at": float(_latest_assistant.get('timestamp') or time.time()),
+                                    "assistant_message_index": _latest_assistant_idx,
+                                },
+                            )
+                        except Exception:
+                            logger.debug("Failed to append assistant_started turn journal event", exc_info=True)
                 s.save()
                 if not ephemeral:
                     try:

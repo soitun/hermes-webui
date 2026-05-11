@@ -19,6 +19,16 @@ def test_streaming_appends_assistant_started_before_final_save():
     assert block_idx < assistant_idx < save_idx
 
 
+def test_streaming_assistant_started_uses_latest_assistant_message():
+    src = Path("api/streaming.py").read_text(encoding="utf-8")
+    block_idx = src.index("if not ephemeral and s.messages:")
+    assistant_idx = src.index('"event": "assistant_started"', block_idx)
+    block = src[block_idx:assistant_idx]
+
+    assert "range(len(s.messages) - 1, -1, -1)" in block
+    assert '"assistant_message_index": _latest_assistant_idx' in src[assistant_idx:src.index("s.save()", assistant_idx)]
+
+
 def test_streaming_appends_completed_after_final_save():
     src = Path("api/streaming.py").read_text(encoding="utf-8")
     assistant_idx = src.index('"event": "assistant_started"')

@@ -63,14 +63,10 @@ def append_turn_journal_event(
     path.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n"
     fd = os.open(path, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
-    try:
-        with os.fdopen(fd, "a", encoding="utf-8") as fh:
-            fh.write(line)
-            fh.flush()
-            os.fsync(fh.fileno())
-    finally:
-        # fd ownership moves to fdopen(); this finally exists only for clarity.
-        pass
+    with os.fdopen(fd, "a", encoding="utf-8") as fh:
+        fh.write(line)
+        fh.flush()
+        os.fsync(fh.fileno())
     try:
         dir_fd = os.open(path.parent, os.O_DIRECTORY)
         try:
@@ -115,7 +111,9 @@ def derive_turn_journal_states(events: Iterable[dict]) -> dict[str, dict]:
         turn_id = str(event.get("turn_id") or "").strip()
         if not turn_id:
             continue
-        states[turn_id] = event
+        previous = states.get(turn_id)
+        if previous is None or float(event.get("created_at") or 0) >= float(previous.get("created_at") or 0):
+            states[turn_id] = event
     return states
 
 

@@ -69,6 +69,15 @@ def test_derive_turn_journal_states_keeps_latest_event_per_turn():
     assert states["turn-2"]["event"] == "submitted"
 
 
+def test_derive_turn_journal_states_uses_created_at_not_file_order():
+    states = derive_turn_journal_states([
+        {"event": "completed", "turn_id": "turn-1", "created_at": 20},
+        {"event": "submitted", "turn_id": "turn-1", "created_at": 10},
+    ])
+
+    assert states["turn-1"]["event"] == "completed"
+
+
 def test_audit_reports_pending_turn_journal_entry_when_user_message_absent(tmp_path):
     _write_session(tmp_path, "sid-1", messages=[])
     append_turn_journal_event(
