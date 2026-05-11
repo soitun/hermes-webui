@@ -3425,45 +3425,49 @@ def get_available_models() -> dict:
                 elif pid == "lmstudio":
                     # LM Studio is a local server — fetch live loaded models via
                     # the OpenAI-compatible /v1/models endpoint (#WebUI).
+                    #
+                    # Two-tier lookup, each in its own try so a failure in one
+                    # does not abort the other (the bug pattern that broke
+                    # tests/test_issue1527_lmstudio_base_url_classification on
+                    # CI environments where hermes_cli isn't importable —
+                    # ImportError in the cli tier was hijacking the whole
+                    # branch and silently skipping the urlopen fallback).
                     raw_models = []
+                    lm_ids: list[str] = []
                     try:
                         from hermes_cli.models import provider_model_ids as _provider_model_ids
-
                         lm_ids = _provider_model_ids("lmstudio") or []
-                        if not lm_ids:
-                            # Fallback: fetch directly using config.yaml providers.lmstudio.base_url
-                            # when env vars (LM_BASE_URL) aren't yet loaded into os.environ.
-                            # This fixes the race where get_available_models() runs before
-                            # the profile's .env has been injected into the process environment.
-                            lm_cfg = cfg.get("providers", {}).get("lmstudio", {})
-                            if isinstance(lm_cfg, dict):
-                                lm_base_url = _get_provider_base_url("lmstudio") or ""
-                                lm_api_key = str(lm_cfg.get("api_key") or "").strip()
-                                if lm_base_url:
-                                    headers = {"User-Agent": "OpenAI/Python 1.0"}
-                                    if lm_api_key:
-                                        headers["Authorization"] = f"Bearer {lm_api_key}"
-                                    endpoint = (lm_base_url + "/models").rstrip("/")
-                                    try:
-                                        import urllib.request as _urlreq
-
-                                        req = _urlreq.Request(endpoint, method="GET", headers=headers)
-                                        with _urlreq.urlopen(req, timeout=5) as resp:
-                                            lm_data = json.loads(resp.read().decode())
-                                        for m in (lm_data.get("data") or []):
-                                            if isinstance(m, dict):
-                                                mid = str(m.get("id") or "").strip()
-                                                if mid and {"id": mid, "label": mid} not in raw_models:
-                                                    raw_models.append({"id": mid, "label": mid})
-                                    except Exception:
-                                        pass  # fall through to hermes_cli below
-
-                        if lm_ids:
-                            raw_models = [
-                                {"id": mid, "label": mid} for mid in lm_ids
-                            ]
                     except Exception:
-                        logger.warning("Failed to load LM Studio models from hermes_cli")
+                        logger.debug("hermes_cli LM Studio lookup unavailable; using urlopen fallback")
+
+                    if lm_ids:
+                        raw_models = [{"id": mid, "label": mid} for mid in lm_ids]
+                    else:
+                        # Fallback: fetch /models directly from the configured
+                        # base URL. Looks for the URL in either
+                        # `cfg["providers"]["lmstudio"]["base_url"]` or
+                        # `cfg["model"]["base_url"]` (via _get_provider_base_url),
+                        # so the historical model-block config shape still works.
+                        lm_cfg = cfg.get("providers", {}).get("lmstudio", {}) or {}
+                        lm_base_url = _get_provider_base_url("lmstudio") or ""
+                        lm_api_key = str(lm_cfg.get("api_key") or "").strip() if isinstance(lm_cfg, dict) else ""
+                        if lm_base_url:
+                            headers = {"User-Agent": "OpenAI/Python 1.0"}
+                            if lm_api_key:
+                                headers["Authorization"] = f"Bearer {lm_api_key}"
+                            endpoint = (lm_base_url + "/models").rstrip("/")
+                            try:
+                                import urllib.request as _urlreq
+                                req = _urlreq.Request(endpoint, method="GET", headers=headers)
+                                with _urlreq.urlopen(req, timeout=5) as resp:
+                                    lm_data = json.loads(resp.read().decode())
+                                for m in (lm_data.get("data") or []):
+                                    if isinstance(m, dict):
+                                        mid = str(m.get("id") or "").strip()
+                                        if mid and {"id": mid, "label": mid} not in raw_models:
+                                            raw_models.append({"id": mid, "label": mid})
+                            except Exception:
+                                logger.debug("LM Studio /models fetch failed at %s", endpoint)
 
                     if raw_models:
                         models = _apply_provider_prefix(raw_models, pid, active_provider)
