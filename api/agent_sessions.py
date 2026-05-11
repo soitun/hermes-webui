@@ -199,6 +199,8 @@ def _is_continuation_session(parent: dict | None, child: dict | None) -> bool:
     """
     if not parent or not child:
         return False
+    if str(child.get('session_source') or '').strip().lower() == 'fork':
+        return False
     parent_source = str(parent.get('source') or '').strip().lower()
     child_source = str(child.get('source') or '').strip().lower()
     if parent_source and child_source and parent_source != child_source:
@@ -496,6 +498,7 @@ def read_session_lineage_report(db_path: Path, session_id: str | None, max_hops:
                 return _empty_lineage_report(sid)
 
             source_expr = _optional_col('source', session_cols)
+            session_source_expr = _optional_col('session_source', session_cols)
             title_expr = _optional_col('title', session_cols)
             started_expr = _optional_col('started_at', session_cols, '0')
             ended_expr = _optional_col('ended_at', session_cols)
@@ -509,6 +512,7 @@ def read_session_lineage_report(db_path: Path, session_id: str | None, max_hops:
                     f"""
                     SELECT s.id,
                            {source_expr},
+                           {session_source_expr},
                            {title_expr},
                            {started_expr},
                            {parent_expr},
@@ -551,6 +555,7 @@ def read_session_lineage_report(db_path: Path, session_id: str | None, max_hops:
                     f"""
                     SELECT s.id,
                            {source_expr},
+                           {session_source_expr},
                            {title_expr},
                            {started_expr},
                            {parent_expr},
