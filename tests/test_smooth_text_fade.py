@@ -85,7 +85,7 @@ let _streamFadeArrivalWps=0;
 let _streamFadeLatestAnimationEndAt=0;
 let _streamFadeLastRevealCount=0;
 let _streamFadeAppendOffset=0;
-const _STREAM_FADE_MS=140;
+const _STREAM_FADE_MS=160;
 const _STREAM_FADE_WAVE_MS=320;
 const _STREAM_FADE_MAX_STAGGER_MS=520;
 const performance={performance_stub};
@@ -156,7 +156,7 @@ def test_fade_helpers_and_constants_exist():
     assert_contains_all(
         MESSAGES_JS,
         [
-            "const _STREAM_FADE_MS=140",
+            "const _STREAM_FADE_MS=160",
             "const _STREAM_FADE_WAVE_MS=320",
             "const _STREAM_FADE_MAX_STAGGER_MS=520",
             "_streamFadeVisibleText",
@@ -172,7 +172,7 @@ def test_schedule_render_keeps_default_smd_path_when_fade_is_off():
     assert "_renderStreamingFadeMarkdown(displayText)" in block
     assert "_smdWrite(displayText)" in block
     assert "_smdNewParser(assistantBody)" in block
-    assert "?16:66" in compact(block)
+    assert "?33:66" in compact(block)
 
 
 def test_fade_renderer_uses_playout_buffer_and_incremental_markdown():
@@ -252,7 +252,7 @@ def test_fade_css_animates_words_and_hides_live_cursor():
         [
             "@keyframes stream-fade-word-in",
             ".stream-fade-word.is-new",
-            "var(--stream-fade-ms,140ms) cubic-bezier(.2,.7,.2,1)",
+            "var(--stream-fade-ms,160ms) cubic-bezier(.2,.7,.2,1)",
             "prefers-reduced-motion: reduce",
             ".msg-body.stream-fade-active > :last-child::after",
             "display:none",

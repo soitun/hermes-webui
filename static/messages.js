@@ -535,7 +535,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
   let _streamFadeLatestAnimationEndAt=0;
   let _streamFadeLastRevealCount=0;
   let _streamFadeAppendOffset=0;
-  const _STREAM_FADE_MS=140;
+  const _STREAM_FADE_MS=160;
   const _STREAM_FADE_WAVE_MS=320;
   const _STREAM_FADE_MAX_STAGGER_MS=520;
   const _streamFadeEnabledForStream=window._fadeTextEffect===true;
@@ -938,7 +938,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         if(_shouldUseStreamFade()){
           const caughtUp=_renderStreamingFadeMarkdown(displayText);
           if(!caughtUp&&!_streamFinalized){
-            setTimeout(()=>_scheduleRender(), 24);
+            setTimeout(()=>_scheduleRender(), 33);
           }
         } else {
           assistantBody.classList.remove('stream-fade-active');
@@ -964,7 +964,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       }
       scrollIfPinned();
     };
-    const frameIntervalMs=_shouldUseStreamFade()?16:66;
+    const frameIntervalMs=_shouldUseStreamFade()?33:66;
     if(sinceLastMs>=frameIntervalMs){
       _pendingRafHandle=requestAnimationFrame(_doRender);
     } else {
