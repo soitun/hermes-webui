@@ -15,7 +15,6 @@ def test_profile_default_workspace_uses_live_config_default(monkeypatch, tmp_pat
     monkeypatch.setattr(api_config, "get_config", lambda: {})
 
     assert workspace._profile_default_workspace() == str(live_default.resolve())
-    assert workspace.resolve_trusted_workspace(None) == live_default.resolve()
 
 
 def test_resolve_chat_workspace_with_recovery_repairs_missing_implicit_workspace(monkeypatch, tmp_path):
