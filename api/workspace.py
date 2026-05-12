@@ -20,9 +20,24 @@ logger = logging.getLogger(__name__)
 from api.config import (
     WORKSPACES_FILE as _GLOBAL_WS_FILE,
     LAST_WORKSPACE_FILE as _GLOBAL_LW_FILE,
-    DEFAULT_WORKSPACE as _BOOT_DEFAULT_WORKSPACE,
     MAX_FILE_BYTES, IMAGE_EXTS, MD_EXTS
 )
+
+
+def _current_default_workspace() -> Path:
+    """Return the live default workspace from api.config.
+
+    ``api.config.DEFAULT_WORKSPACE`` is mutable at runtime (for example after
+    ``save_settings()``). Importing it once into this module bakes in a stale
+    snapshot that can diverge from the actual current default and leak deleted
+    test workspaces back into live sessions.
+    """
+    try:
+        from api import config as _config
+
+        return Path(_config.DEFAULT_WORKSPACE).expanduser().resolve()
+    except Exception:
+        return Path.home().expanduser().resolve()
 
 
 # ── Profile-aware path resolution ───────────────────────────────────────────
@@ -64,7 +79,7 @@ def _profile_default_workspace() -> str:
       2. 'default_workspace' — alternate explicit key
       3. 'terminal.cwd'      — hermes-agent terminal working dir (most common)
 
-    Falls back to the boot-time DEFAULT_WORKSPACE constant.
+    Falls back to the live DEFAULT_WORKSPACE from api.config.
     """
     try:
         from api.config import get_config
@@ -86,7 +101,7 @@ def _profile_default_workspace() -> str:
                     return str(p)
     except (ImportError, Exception):
         logger.debug("Failed to load profile default workspace config")
-    return str(_BOOT_DEFAULT_WORKSPACE)
+    return str(_current_default_workspace())
 
 
 # ── Public API ──────────────────────────────────────────────────────────────
@@ -427,7 +442,7 @@ def _trusted_workspace_roots() -> list[Path]:
             roots.append(p)
 
     add(Path.home())
-    add(_BOOT_DEFAULT_WORKSPACE)
+    add(_current_default_workspace())
     for w in load_workspaces():
         add(w.get("path"))
     roots.sort(key=lambda p: len(str(p)))
@@ -536,11 +551,10 @@ def resolve_trusted_workspace(path: str | Path | None = None) -> Path:
          /boot, /proc, /sys, /dev, /root on Linux/macOS; Windows system dirs).
          This prevents even admin-saved workspaces from pointing at OS internals.
 
-    None/empty path falls back to the boot-time DEFAULT_WORKSPACE, which is always
-    trusted (it was validated at server startup).
+    None/empty path falls back to the current DEFAULT_WORKSPACE.
     """
     if path in (None, ""):
-        return Path(_BOOT_DEFAULT_WORKSPACE).expanduser().resolve()
+        return _current_default_workspace()
 
     candidate = Path(path).expanduser().resolve()
 
@@ -571,14 +585,14 @@ def resolve_trusted_workspace(path: str | Path | None = None) -> Path:
     except Exception:
         pass
 
-    # (C) Trusted if it is equal to or under the boot-time DEFAULT_WORKSPACE.
+    # (C) Trusted if it is equal to or under the current DEFAULT_WORKSPACE.
     #     In Docker deployments HERMES_WEBUI_DEFAULT_WORKSPACE is often set to a
     #     volume mount outside the user's home (e.g. /data/workspace).  That path
     #     was already validated at server startup, so any sub-path of it is safe
     #     without requiring the user to add it to the workspace list manually.
     try:
-        boot_default = Path(_BOOT_DEFAULT_WORKSPACE).expanduser().resolve()
-        candidate.relative_to(boot_default)
+        current_default = _current_default_workspace()
+        candidate.relative_to(current_default)
         return candidate
     except ValueError:
         pass

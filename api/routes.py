@@ -6967,7 +6967,7 @@ def _handle_chat_start(handler, body, diag=None):
         attachments = _normalize_chat_attachments(body.get("attachments") or [])[:20]
         diag.stage("resolve_workspace") if diag else None
         try:
-            workspace = str(resolve_trusted_workspace(body.get("workspace") or s.workspace))
+            workspace = _resolve_chat_workspace_with_recovery(s, body.get("workspace"))
         except ValueError as e:
             return bad(handler, str(e))
         requested_model = body.get("model") or s.model
@@ -6998,6 +6998,45 @@ def _handle_chat_start(handler, body, diag=None):
         if diag:
             diag.finish()
 
+
+
+def _resolve_chat_workspace_with_recovery(s, requested_workspace) -> str:
+    """Resolve a chat workspace, recovering stale implicit session paths.
+
+    If the browser explicitly sent a workspace, preserve the existing strict
+    validation behaviour and surface any error to the user.
+
+    If the browser omitted ``workspace`` and the session's stored workspace now
+    points at a deleted directory (common after old test workspaces are cleaned
+    up), fall back to the current last/default workspace and persist the repair
+    so the chat becomes usable again.
+    """
+    explicit = requested_workspace not in (None, "")
+    candidate = requested_workspace if explicit else getattr(s, "workspace", None)
+    try:
+        return str(resolve_trusted_workspace(candidate))
+    except ValueError:
+        if explicit:
+            raise
+        fallback = str(resolve_trusted_workspace(get_last_workspace()))
+        stale = str(candidate or "").strip()
+        if stale and fallback != stale:
+            logger.warning(
+                "Recovered stale session workspace for %s: %s -> %s",
+                getattr(s, "session_id", "unknown"),
+                stale,
+                fallback,
+            )
+            s.workspace = fallback
+            try:
+                s.save()
+            except Exception:
+                logger.debug(
+                    "Failed to persist recovered workspace for session %s",
+                    getattr(s, "session_id", "unknown"),
+                )
+            return fallback
+        raise
 
 
 def _normalize_chat_attachments(raw_attachments):
