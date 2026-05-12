@@ -8,7 +8,12 @@ from __future__ import annotations
 
 import pathlib
 
-from api.streaming import _cancelled_turn_content, _classify_provider_error, _finalize_cancelled_turn
+from api.streaming import (
+    _CANCEL_MARKER_PATTERNS,
+    _cancelled_turn_content,
+    _classify_provider_error,
+    _finalize_cancelled_turn,
+)
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.resolve()
 
@@ -40,6 +45,13 @@ class TestCancelledTurnClassification:
         assert "provider returned no content" not in result.get("hint", "").lower()
         assert "rate limit" not in result.get("hint", "").lower()
         assert "no provider failure" in result.get("hint", "").lower()
+
+    def test_string_only_cancelled_error_repr_is_cancelled(self):
+        result = _classify_provider_error("<CancelledError>", None, silent_failure=True)
+
+        assert result["type"] == "cancelled"
+        assert result["label"] == "Task cancelled"
+        assert "provider returned no content" not in result.get("hint", "").lower()
 
     def test_interrupted_or_aborted_error_is_not_provider_no_response(self):
         for text in (
@@ -101,6 +113,12 @@ class TestCancelledTurnFinalizer:
 
 
 class TestCancelledTurnPersistenceGuards:
+    def test_cancel_marker_patterns_are_centralized_for_dedupe(self):
+        assert _CANCEL_MARKER_PATTERNS == ('task cancelled', 'task canceled', 'response interrupted')
+        src = _read("api/streaming.py")
+        assert "any(pattern in normalized for pattern in _CANCEL_MARKER_PATTERNS)" in src
+        assert "any(pattern in _content for pattern in _CANCEL_MARKER_PATTERNS)" in src
+
     def test_silent_failure_path_checks_cancel_event_before_persisting_provider_error(self):
         src = _read("api/streaming.py")
         silent_idx = src.find("# ── Detect silent agent failure")
