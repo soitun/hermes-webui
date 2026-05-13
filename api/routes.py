@@ -3718,6 +3718,8 @@ def handle_get(handler, parsed) -> bool:
                         "current_sha": "abc1234",
                         "latest_sha": "def5678",
                         "branch": "master",
+                        "repo_url": "https://github.com/nesquena/hermes-webui",
+                        "compare_url": "https://github.com/nesquena/hermes-webui/compare/abc1234...def5678",
                     },
                     "agent": {
                         "name": "agent",
@@ -3725,6 +3727,8 @@ def handle_get(handler, parsed) -> bool:
                         "current_sha": "aaa0001",
                         "latest_sha": "bbb0002",
                         "branch": "master",
+                        "repo_url": "https://github.com/NousResearch/hermes-agent",
+                        "compare_url": "https://github.com/NousResearch/hermes-agent/compare/aaa0001...bbb0002",
                     },
                     "checked_at": 0,
                 },
@@ -5271,6 +5275,63 @@ def handle_post(handler, parsed) -> bool:
         from api.updates import apply_force_update
 
         return j(handler, apply_force_update(target))
+
+    if parsed.path == "/api/updates/summary":
+        from api.updates import summarize_update_payload
+
+        updates = body.get("updates") if isinstance(body, dict) else {}
+        target = body.get("target") if isinstance(body, dict) else None
+
+        def _llm_update_summary(system_prompt: str, user_prompt: str) -> str:
+            from run_agent import AIAgent
+            from api.config import (
+                get_effective_default_model,
+                resolve_model_provider,
+                resolve_custom_provider_connection,
+            )
+
+            _model, _provider, _base_url = resolve_model_provider(get_effective_default_model())
+            _api_key = None
+            try:
+                from api.oauth import resolve_runtime_provider_with_anthropic_env_lock
+                from hermes_cli.runtime_provider import resolve_runtime_provider
+
+                _rt = resolve_runtime_provider_with_anthropic_env_lock(
+                    resolve_runtime_provider,
+                    requested=_provider,
+                )
+                _api_key = _rt.get("api_key")
+                if not _provider:
+                    _provider = _rt.get("provider")
+                if not _base_url:
+                    _base_url = _rt.get("base_url")
+            except Exception as _e:
+                logger.debug("update summary runtime provider resolution failed: %s", _e)
+            if isinstance(_provider, str) and _provider.startswith("custom:"):
+                _cp_key, _cp_base = resolve_custom_provider_connection(_provider)
+                if not _api_key and _cp_key:
+                    _api_key = _cp_key
+                if not _base_url and _cp_base:
+                    _base_url = _cp_base
+            agent = AIAgent(
+                model=_model,
+                provider=_provider,
+                base_url=_base_url,
+                api_key=_api_key,
+                platform="webui",
+                quiet_mode=True,
+                enabled_toolsets=[],
+                session_id=f"updates-summary-{uuid.uuid4().hex[:8]}",
+            )
+            result = agent.run_conversation(
+                user_message=user_prompt,
+                system_message=system_prompt,
+                conversation_history=[],
+                task_id=f"updates-summary-{uuid.uuid4().hex[:8]}",
+            )
+            return str(result.get("final_response") or "").strip()
+
+        return j(handler, summarize_update_payload(updates, llm_callback=_llm_update_summary, target=target))
 
     # ── CLI session import (POST) ──
     if parsed.path == "/api/session/import_cli":
