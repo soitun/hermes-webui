@@ -244,6 +244,14 @@ def test_compression_anchor_index_is_translated_into_render_window():
     assert "windowStart+renderVisWithIdx.length" in block
 
 
+def test_reference_message_uses_raw_transcript_position_before_anchor_fallback():
+    src = _read("static/ui.js")
+
+    assert "const referenceMessageRawIdx=referenceMessage?S.messages.findIndex(m=>m===referenceMessage):-1;" in src
+    assert "if(referenceNode&&referenceMessageRawIdx>=0) _insertCompressionLikeNodeByRawIdx(referenceNode, referenceMessageRawIdx);" in src
+    assert "else _insertCompressionLikeNode(referenceNode);" in src
+
+
 def test_preserved_task_list_attaches_once_per_render():
     src = _read("static/ui.js")
 
