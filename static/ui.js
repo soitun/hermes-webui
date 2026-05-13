@@ -6284,6 +6284,20 @@ function _thinkingMarkup(text=''){
     ? `<div class="thinking-card${openClass}"><div class="thinking-card-header" onclick="this.parentElement.classList.toggle('open')"><span class="thinking-card-icon">${li('lightbulb',14)}</span><span class="thinking-card-label">${t('thinking')}</span><span class="thinking-card-toggle">${li('chevron-right',12)}</span></div><div class="thinking-card-body"><pre>${esc(String(clean).trim())}</pre></div></div>`
     : `<div class="thinking"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
 }
+function _renderThinkingInto(row,text=''){
+  if(!row) return;
+  const clean=_sanitizeThinkingDisplayText(text);
+  if(!clean){
+    row.innerHTML=_thinkingMarkup(text);
+    return;
+  }
+  const pre=row.querySelector('.thinking-card-body pre');
+  if(pre){
+    pre.textContent=clean;
+    return;
+  }
+  row.innerHTML=_thinkingMarkup(text);
+}
 function finalizeThinkingCard(){
   // Guard: only finalize thinking card if we're looking at the session that started it.
   // Without this check, switching tabs while a stream is running causes finalizeThinkingCard
@@ -6365,7 +6379,7 @@ function appendThinking(text=''){
       else blocks.appendChild(row);
     }
     row.className=(text&&String(text).trim())?'assistant-segment thinking-card-row':'assistant-segment';
-    row.innerHTML=_thinkingMarkup(text);
+    _renderThinkingInto(row,text);
     scrollIfPinned();
     // Auto-scroll the thinking card body to bottom if the user is watching
     // (scroll pinned). If the user scrolled up to read history, leave it alone.
@@ -6394,7 +6408,7 @@ function appendThinking(text=''){
     row.setAttribute('data-thinking-active','1');
     body.insertBefore(row, body.firstChild);
   }
-  row.innerHTML=_thinkingMarkup(text);
+  _renderThinkingInto(row,text);
   _syncToolCallGroupSummary(group);
   scrollIfPinned();
   if(_scrollPinned){

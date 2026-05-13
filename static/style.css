@@ -1896,13 +1896,19 @@ body.resizing .sidebar{transition:none!important;}
   position:absolute;inset:0;
   background-color:var(--bg);
   pointer-events:none;
-  -webkit-mask-image:linear-gradient(90deg,rgba(0,0,0,0) 0%,rgba(0,0,0,0) 47%,rgba(0,0,0,1) 49%,rgba(0,0,0,1) 51%,rgba(0,0,0,0) 53%,rgba(0,0,0,0) 100%);
-          mask-image:linear-gradient(90deg,rgba(0,0,0,0) 0%,rgba(0,0,0,0) 47%,rgba(0,0,0,1) 49%,rgba(0,0,0,1) 51%,rgba(0,0,0,0) 53%,rgba(0,0,0,0) 100%);
+  -webkit-mask-image:linear-gradient(90deg,rgba(0,0,0,0) 0%,rgba(0,0,0,0) 45.5%,rgba(0,0,0,.12) 46.5%,rgba(0,0,0,.32) 47.5%,rgba(0,0,0,.58) 48.5%,rgba(0,0,0,.8) 49%,rgba(0,0,0,.8) 51%,rgba(0,0,0,.58) 51.5%,rgba(0,0,0,.32) 52.5%,rgba(0,0,0,.12) 53.5%,rgba(0,0,0,0) 54.5%,rgba(0,0,0,0) 100%);
+          mask-image:linear-gradient(90deg,rgba(0,0,0,0) 0%,rgba(0,0,0,0) 45.5%,rgba(0,0,0,.12) 46.5%,rgba(0,0,0,.32) 47.5%,rgba(0,0,0,.58) 48.5%,rgba(0,0,0,.8) 49%,rgba(0,0,0,.8) 51%,rgba(0,0,0,.58) 51.5%,rgba(0,0,0,.32) 52.5%,rgba(0,0,0,.12) 53.5%,rgba(0,0,0,0) 54.5%,rgba(0,0,0,0) 100%);
   -webkit-mask-size:250% 100%;
           mask-size:250% 100%;
   -webkit-mask-repeat:no-repeat;
           mask-repeat:no-repeat;
-  animation:_tool-shimmer-sweep 1.5s linear infinite;
+  animation:_tool-shimmer-sweep 2.0s linear infinite;
+}
+@media (prefers-reduced-motion: reduce){
+  .tool-call-group[data-live-tool-call-group="1"] .tool-call-group-label::after{
+    animation:none;
+    display:none;
+  }
 }
 /* Fallback for browsers without CSS mask support */
 @supports not (mask-image:none){
