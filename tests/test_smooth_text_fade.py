@@ -77,9 +77,9 @@ let _streamFadeLatestAnimationEndAt=0;
 let _streamFadeAppendOffset=0;
 let _streamFadeVisibleWords=0;
 let _streamFadeHoldUntilMs=0;
-const _STREAM_FADE_MS=160;
-const _STREAM_FADE_STAGGER_MS=12;
-const _STREAM_FADE_DONE_MAX_MS=220;
+const _STREAM_FADE_MS=200;
+const _STREAM_FADE_STAGGER_MS=16;
+const _STREAM_FADE_DONE_MAX_MS=320;
 const performance={performance_stub};
 {helpers}
 """
@@ -187,7 +187,7 @@ def test_stream_fade_css_is_opacity_only_and_hides_live_cursor():
         [
             "@keyframes stream-fade-word-in",
             ".stream-fade-word.is-new",
-            "var(--stream-fade-ms,160ms) cubic-bezier(.2,.7,.2,1)",
+            "var(--stream-fade-ms,240ms) cubic-bezier(.2,.7,.2,1)",
             "prefers-reduced-motion: reduce",
             ".msg-body.stream-fade-active > :last-child::after",
             "display:none",
@@ -195,6 +195,14 @@ def test_stream_fade_css_is_opacity_only_and_hides_live_cursor():
         ],
     )
     assert ".stream-fade-active .stream-fade-word{display:inline;}" in fade_css
+
+
+def test_stream_fade_reduced_motion_listener_is_cleaned_up_on_terminal_paths():
+    assert "_streamFadeReduceMotionOnChange" in MESSAGES_JS
+    assert "function _streamFadeCleanupReduceMotionListener()" in MESSAGES_JS
+    assert "removeEventListener('change',_streamFadeReduceMotionOnChange)" in MESSAGES_JS
+    assert "removeListener(_streamFadeReduceMotionOnChange)" in MESSAGES_JS
+    assert MESSAGES_JS.count("_streamFadeCleanupReduceMotionListener();") >= 4
 
 
 def test_stream_fade_playout_handles_fast_models_without_paragraph_pops():

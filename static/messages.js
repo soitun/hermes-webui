@@ -538,6 +538,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
   let _streamFadeHoldUntilMs=0;
   let _streamFadeReduceMotionMql=null;
   let _streamFadeReduceMotion=false;
+  let _streamFadeReduceMotionOnChange=null;
   const _STREAM_FADE_MS=200;
   const _STREAM_FADE_STAGGER_MS=16;
   const _STREAM_FADE_DONE_MAX_MS=320;
@@ -727,11 +728,18 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     if(!_streamFadeReduceMotionMql){
       _streamFadeReduceMotionMql=window.matchMedia('(prefers-reduced-motion: reduce)');
       _streamFadeReduceMotion=!!_streamFadeReduceMotionMql.matches;
-      const onChange=e=>{_streamFadeReduceMotion=!!e.matches;};
-      try{_streamFadeReduceMotionMql.addEventListener('change',onChange);}
-      catch(_){try{_streamFadeReduceMotionMql.addListener(onChange);}catch(_){}}
+      _streamFadeReduceMotionOnChange=e=>{_streamFadeReduceMotion=!!e.matches;};
+      try{_streamFadeReduceMotionMql.addEventListener('change',_streamFadeReduceMotionOnChange);}
+      catch(_){try{_streamFadeReduceMotionMql.addListener(_streamFadeReduceMotionOnChange);}catch(_){}}
     }
     return _streamFadeReduceMotion;
+  }
+  function _streamFadeCleanupReduceMotionListener(){
+    if(!_streamFadeReduceMotionMql||!_streamFadeReduceMotionOnChange) return;
+    try{_streamFadeReduceMotionMql.removeEventListener('change',_streamFadeReduceMotionOnChange);}
+    catch(_){try{_streamFadeReduceMotionMql.removeListener(_streamFadeReduceMotionOnChange);}catch(_){}}
+    _streamFadeReduceMotionMql=null;
+    _streamFadeReduceMotionOnChange=null;
   }
   function _streamFadeBindCleanup(el){
     if(!el||el._streamFadeCleanupBound) return;
@@ -1245,6 +1253,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         // can reintroduce a stale thinking card or duplicate content.
         _streamFinalized=true;
         _cancelAnimationFramePendingStreamRender();
+        _streamFadeCleanupReduceMotionListener();
         if(typeof finalizeThinkingCard==='function') finalizeThinkingCard();
         // Finalize smd parser — flushes any remaining buffered markdown state
         // and runs Prism + copy buttons on the live segment before the DOM is replaced
@@ -1489,6 +1498,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       if(_persistTimer){clearTimeout(_persistTimer);_persistTimer=null;}
       _streamFinalized=true;
       _cancelAnimationFramePendingStreamRender();
+      _streamFadeCleanupReduceMotionListener();
       _smdEndParser();
       if(typeof finalizeThinkingCard==='function') finalizeThinkingCard();
       // Application-level error sent explicitly by the server (rate limit, crash, etc.)
@@ -1575,6 +1585,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       if(_persistTimer){clearTimeout(_persistTimer);_persistTimer=null;}
       _streamFinalized=true;
       _cancelAnimationFramePendingStreamRender();
+      _streamFadeCleanupReduceMotionListener();
       _smdEndParser();
       if(typeof finalizeThinkingCard==='function') finalizeThinkingCard();
       source.close();
@@ -1669,6 +1680,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     if(_persistTimer){clearTimeout(_persistTimer);_persistTimer=null;}
     _streamFinalized=true;
     _cancelAnimationFramePendingStreamRender();
+    _streamFadeCleanupReduceMotionListener();
     if(typeof finalizeThinkingCard==='function') finalizeThinkingCard();
     _clearOwnerInflightState();
     _closeSource();

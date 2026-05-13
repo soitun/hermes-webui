@@ -20,16 +20,16 @@ Adds an opt-in `Fade text effect` preference for live assistant responses. When 
 - Uses Hermes' existing incremental `streaming-markdown` parser with a custom renderer instead of full markdown re-renders.
 - Only newly appended words are wrapped and animated.
 - Animated spans are replaced with plain text by a delegated `animationend` handler, avoiding long-lived wrapper buildup without per-word listeners.
-- Reduced-motion preference is cached with a media-query listener instead of checked for every appended text node.
+- Reduced-motion preference is cached with a media-query listener instead of checked for every appended text node, and terminal stream paths remove the listener.
 - Unsafe streamed `href`/`src` values are blocked in the fade renderer `set_attr` path.
 - On `done`, fade mode drains buffered text, ends the parser to flush pending markdown, and waits for the final fade/stagger window before the final `renderMessages()` replacement.
 
 ## Performance/readability tuning
 
-- Normal fade duration: `160ms`
-- Word stagger: `12ms`
-- Done drain wait cap: `220ms`
-- Visual playback is capped at `100 wps`.
+- Normal fade duration: `200ms`
+- Word stagger: `16ms`
+- Done drain wait cap: `320ms`
+- Visual playback is capped at `160 wps`.
 - Reveals at most `2 words/frame`, or `3 words/frame` only with very large backlog.
 - Reveal steps pause briefly after sentence punctuation and paragraph breaks so very fast models feel less overwhelming.
 - Target word counts reuse the already-visible word count plus backlog count, avoiding repeated full-response word scans on each tick.
@@ -46,7 +46,7 @@ git diff --check
 Latest focused result:
 
 ```text
-68 passed
+69 passed
 ```
 
 ## Manual QA suggested
