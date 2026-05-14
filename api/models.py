@@ -19,7 +19,11 @@ from api.config import (
     get_effective_default_model, _get_session_agent_lock,
 )
 from api.workspace import get_last_workspace
-from api.agent_sessions import read_importable_agent_session_rows, read_session_lineage_metadata
+from api.agent_sessions import (
+    _is_continuation_session,
+    read_importable_agent_session_rows,
+    read_session_lineage_metadata,
+)
 
 logger = logging.getLogger(__name__)
 CLI_VISIBLE_SESSION_LIMIT = 20
@@ -1805,7 +1809,6 @@ def get_cli_session_messages(sid) -> list:
     continuation chain, return the stitched full transcript across all segments
     in chronological order. Returns empty list on any error.
     """
-    import os
     if str(sid or '').startswith(f'{CLAUDE_CODE_SOURCE}_'):
         return get_claude_code_session_messages(sid)
     try:
@@ -1813,12 +1816,7 @@ def get_cli_session_messages(sid) -> list:
     except ImportError:
         return []
 
-    try:
-        from api.profiles import get_active_hermes_home
-        hermes_home = Path(get_active_hermes_home()).expanduser().resolve()
-    except Exception:
-        hermes_home = Path(os.getenv('HERMES_HOME', str(HOME / '.hermes'))).expanduser().resolve()
-    db_path = hermes_home / 'state.db'
+    db_path = _active_state_db_path()
     if not db_path.exists():
         return []
 
