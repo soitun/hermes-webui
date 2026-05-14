@@ -12,6 +12,10 @@
 
 - **PR #2236** by @jasonjcwu — Silent failure detection in `api/streaming.py` now scans only NEW messages, not the full conversation history. Pre-fix, the `_assistant_added` check at `_run_agent_streaming` scanned all messages in `result["messages"]` (including pre-turn history); if any prior turn contained an assistant response, `_assistant_added` was `True` and the apperror SSE event was silently skipped, leaving the user staring at a blank response after a provider 401/429/rate-limit error. Fix extracts a `_has_new_assistant_reply(all_messages, prev_count)` helper that only inspects messages beyond the pre-turn history offset (`_previous_context_messages`); applied to both the main detection path and the self-heal/retry `_heal_ok` check. 15-test regression suite covering empty/short/long-history scenarios, the heal path, and the `len < prev_count` edge-case fallback. Also includes a small alignment fix to `test_issue1857_usage_overwrite.py` so the FakeAgent message shape matches what the real agent produces.
 
+### Docs
+
+- **PR #2251** by @franksong2702 (refs #1925) — Updates the Hermes run adapter RFC to codify the #1925 review direction: WebUI stays broad in product scope but becomes thin in execution ownership. The revised RFC credits Michael Lam's "protocol translator, not runtime surrogate" guardrail, defines the browser event/control contract, classifies current runtime state into runner/journal/adapter/presentation ownership, adds an acceptance-test catalog, and gates the first implementation slice to append-only journal/replay without changing `_run_agent_streaming` control flow.
+
 ## [v0.51.60] — 2026-05-14 — Release AJ (stage-353 — 3-PR overlapping Appearance + critical #2223 compression-rotation data-loss fix + Opus SHOULD-FIX on parent_session_id)
 
 ### Fixed
