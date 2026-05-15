@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- Mobile/backgrounded chat streams no longer immediately insert a permanent `**Error:** Connection lost` bubble when Android/browser tab suspension drops the SSE connection. The client now defers stream-error finalization while the page is hidden/discarded, keeps the stream marked active locally, and reattaches or restores the settled session when the tab returns before showing a real failure.
+
 - **PR #2275** by @ai-ag2026 — CLI/messaging continuation sessions (sessions stitched from a `parent_session_id` chain) now return their full transcript instead of an empty list. Pre-fix, `get_cli_session_messages()` called `_is_continuation_session()` while walking the parent chain, but `api/models.py` didn't import that helper. The exception was swallowed by `except Exception: return []`, so valid external sessions could fall through silently. Adds regression coverage that a stitched continuation chain returns a non-empty transcript.
 
 - **PR #2277** by @eleboucher — Rootless container runtimes (k8s `runAsNonRoot: true`, OpenShift restricted SCC, `docker --user`, rootless Podman) no longer hit a cascade of permission errors at startup. Pre-fix, the rootless branch skipped the root init phase entirely, but root init also did rsync, `/uv_cache` permissions, `~/hermeswebui` home directory creation, and `/workspace` writability. `docker_init.bash` now distinguishes "no root init available" from "root init available but skipped", running the work that doesn't need root in the rootless branch too.
