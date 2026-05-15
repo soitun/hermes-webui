@@ -107,14 +107,12 @@ class TestWorkspacePanelCollapsePriority:
 
     def test_workspace_label_shrinks_with_ellipsis(self):
         """The "Workspace" label must shrink with ellipsis truncation."""
-        shrink with ellipsis truncation rather than overflow uncontrollably."""
         # Find the rule
         sel = ".workspace-panel-title-group > span:first-child"
         idx = STYLE_CSS.find(sel)
         assert idx >= 0, f"Selector {sel!r} not found in style.css"
         rule = STYLE_CSS[idx: STYLE_CSS.find("}", idx)]
         assert "text-overflow:ellipsis" in rule
-        assert "min-width:0" in rule
         assert "min-width:0" in rule
 
     def test_git_badge_uses_second_row(self):
