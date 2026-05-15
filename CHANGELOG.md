@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **PR #2279** by @franksong2702 (closes #2262 + refs #2168) — WebUI stream completion recovery gaps closed for both `notify_on_complete` background tasks and the preserved-task-list compression marker UI. Pre-fix, completions held in the agent process registry were never drained by the WebUI gateway session because the gateway session platform was unset. The fix routes the completion queue by process session key before injecting any notification into a WebUI turn. Separately, the preserved-task-list compression marker — an internal sentinel — was sometimes the only assistant text rendered after a context compression turn timed out, leaving a confusing "preserved tasks" message with no actual response. The frontend now suppresses the marker when it's the only assistant content and the run state is terminal.
+
+- **PR #2299** by @starship-s — Background workers (title generation, manual session compression, update-summary generation) now correctly inherit profile-scoped configuration when a profile-scoped chat triggers them. Pre-fix, those workers read default-profile configuration instead of the session/request profile, so auxiliary model routing silently used the wrong configured model or failed provider resolution entirely. The fix threads the active profile context through `_run_background_title_update`, `_run_background_title_refresh`, and the manual compression and update-summary helpers, with regression tests covering all three paths.
+
+- **PR #2306** by @dobby-d-elf (follow-up to v0.51.66) — Workspace panel header polish + test cleanup. Single close button on the workspace panel (was double in some states), tooltip now reads "Close" (was inconsistent label), `.close-preview` opacity removed so the X button matches other panel icon styling. Companion test cleanup removes ~293 lines of stale assertions in `test_issue781.py`, `test_sprint41.py`, `test_sprint44.py`, and `test_workspace_panel_session_list.py` that tested behavior either no longer present after #2238 or covered redundantly by other test files.
+
+## [v0.51.66] — 2026-05-15 — Release AP (stage-359 — 17-PR safe-lane batch — Docker fixes + UI polish + compression snapshot improvements + i18n parity + profile validation)
+
 ### Added
 
 - **PR #2287** by @mslovy (refs #2284) — Upload size limit is now runtime-configurable via the `HERMES_WEBUI_MAX_UPLOAD_MB` environment variable. Previously the effective 20 MB cap was hard-coded across multiple layers. Server-side upload limit moves to runtime config; browser-side preflight check stays aligned with the effective backend limit; archive extraction guard continues to scale with the same configured cap. New `_env_mb_bytes()` helper in `api/config.py` parses `HERMES_WEBUI_MAX_UPLOAD_MB`.
