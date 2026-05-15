@@ -1587,6 +1587,66 @@ def _run_background_title_refresh(session_id: str, user_text: str, assistant_tex
         logger.debug("Background title refresh failed for session %s", session_id, exc_info=True)
 
 
+def _preserve_pre_compression_snapshot(s, old_sid: str) -> None:
+    """Persist old_sid as a read-only pre-compression snapshot.
+
+    Context compression rotates the active WebUI session id from old_sid to the
+    agent's new continuation id. The old JSON must remain on disk for lineage
+    traversal, but it should not continue to appear as an active sidebar row.
+    """
+    old_path = SESSION_DIR / f'{old_sid}.json'
+    if not old_path.exists():
+        return
+    try:
+        existing_text = old_path.read_text(encoding='utf-8')
+        try:
+            existing = json.loads(existing_text)
+            existing_msgs = len(existing.get('messages') or [])
+            existing_snapshot = bool(existing.get('pre_compression_snapshot'))
+        except (json.JSONDecodeError, ValueError):
+            # Treat corrupt/malformed old JSON as missing history and rewrite it
+            # from the in-memory pre-compression messages below. That is safer
+            # than leaving an unreadable recovery snapshot behind.
+            existing_msgs = -1
+            existing_snapshot = False
+        if len(s.messages) <= existing_msgs and existing_snapshot:
+            return
+        if len(s.messages) > existing_msgs:
+            # In-memory messages are newer than the file; save the full old
+            # snapshot from the current session object while preserving its
+            # pre-existing parent_session_id lineage.
+            saved_sid = s.session_id
+            saved_snapshot = bool(getattr(s, 'pre_compression_snapshot', False))
+            s.session_id = old_sid
+            s.pre_compression_snapshot = True
+            try:
+                s.save(touch_updated_at=False, skip_index=False)
+                logger.info(
+                    "Preserved pre-compression session %s (%d messages) to disk",
+                    old_sid, len(s.messages),
+                )
+            finally:
+                s.session_id = saved_sid
+                s.pre_compression_snapshot = saved_snapshot
+            return
+        # Existing file is already at least as complete as memory; stamp only
+        # the snapshot marker so index/sidebar projection can hide it without
+        # rewriting a shorter messages array over a fuller transcript.
+        from api.models import Session
+        snapshot = Session.load(old_sid)
+        if snapshot:
+            snapshot.pre_compression_snapshot = True
+            snapshot.save(touch_updated_at=False, skip_index=False)
+            logger.info(
+                "Marked pre-compression session %s as sidebar-hidden snapshot",
+                old_sid,
+            )
+    except OSError:
+        logger.debug("Could not read old session file before preservation")
+    except Exception:
+        logger.debug("Failed to preserve pre-compression session file", exc_info=True)
+
+
 def _maybe_schedule_title_refresh(session, put_event, agent):
     """Check if the session is due for an adaptive title refresh and schedule it."""
     refresh_interval = _get_title_refresh_interval()
@@ -3599,8 +3659,6 @@ def _run_agent_streaming(
                 if _agent_sid and _agent_sid != session_id:
                     old_sid = session_id
                     new_sid = _agent_sid
-                    old_path = SESSION_DIR / f'{old_sid}.json'
-                    new_path = SESSION_DIR / f'{new_sid}.json'
                     s.session_id = new_sid
                     # Carry profile identity across the compression boundary.
                     # Without this, s.profile stays None on the continuation
@@ -3631,39 +3689,7 @@ def _run_agent_streaming(
                     # compression removes messages from the model's context.  Skip
                     # the write when the file already contains up-to-date data
                     # (i.e. it was just saved by a checkpoint).
-                    if old_path.exists():
-                        try:
-                            existing_text = old_path.read_text(encoding='utf-8')
-                            try:
-                                existing = json.loads(existing_text)
-                                existing_msgs = len(existing.get('messages') or [])
-                            except (json.JSONDecodeError, ValueError):
-                                existing_msgs = -1
-                            if len(s.messages) > existing_msgs:
-                                # In-memory messages are newer than the file — save.
-                                # Preserve s.parent_session_id as-is (do NOT clear it):
-                                # the OLD session's parent_session_id is its own
-                                # pre-existing lineage (e.g. a /branch fork's
-                                # parent_session_id back to the original).  We must
-                                # not overwrite that with None on disk.  Stage-353
-                                # Opus SHOULD-FIX: previous code cleared parent
-                                # before save then restored after — but the on-disk
-                                # copy persisted with parent=None, breaking
-                                # fork-of-fork lineage traversal.  (#2227 + #2223)
-                                saved_sid = s.session_id
-                                s.session_id = old_sid
-                                try:
-                                    s.save(touch_updated_at=False, skip_index=True)
-                                    logger.info(
-                                        "Preserved pre-compression session %s (%d messages) to disk",
-                                        old_sid, len(s.messages),
-                                    )
-                                except Exception:
-                                    logger.debug("Failed to preserve pre-compression session file", exc_info=True)
-                                finally:
-                                    s.session_id = saved_sid
-                        except OSError:
-                            logger.debug("Could not read old session file before preservation")
+                    _preserve_pre_compression_snapshot(s, old_sid)
                     # Always link the continuation session to its immediate predecessor
                     # (the preserved snapshot).  This OVERRIDES any prior
                     # parent_session_id because the new continuation IS the next link
