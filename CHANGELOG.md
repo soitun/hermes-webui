@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- New profile creation now validates submitted `default_model` / `model_provider` values against the server-side `/api/models` catalog before writing them to the profile config. Hand-crafted requests with nonexistent models now return a clear error instead of creating a profile that fails later at runtime. Empty model selection still means "use the active profile default." Refs #2240.
+
 ### Added
 
 - **PR #2099** by @dobby-d-elf — Adds an opt-in `Settings → Preferences → Fade text effect` toggle (off by default). When enabled, newly streamed output tokens are revealed through an adaptive playout buffer and animated with an opacity-only fade similar to ChatGPT and other frontier LLM apps. Implementation details: fade locked per stream to avoid mid-stream toggle rewind; reduced-motion users get non-animated text; live cursor hidden while fade is active; custom renderer on `streaming-markdown` parser wraps only newly-appended words; animated spans replace themselves with plain text on `animationend` (no long-lived wrapper buildup in long responses); unsafe streamed `href`/`src` values blocked in fade renderer `set_attr` path. Performance tuning: 200ms base fade duration scaling to 350ms for fast output, 16ms word stagger, 320ms done-drain wait cap, 160 wps visual cap, max 2-3 words/frame, brief pauses after sentence punctuation. Default-off means existing users see no change. 293-line regression test pinning the contract.
