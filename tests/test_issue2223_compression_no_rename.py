@@ -117,6 +117,10 @@ class TestNoRenameDuringCompression:
         assert old_payload["pre_compression_snapshot"] is True
         assert old_payload["parent_session_id"] == "fork_parent"
         assert len(old_payload["messages"]) == 2
+        index = json.loads((session_dir / "_index.json").read_text(encoding="utf-8"))
+        index_by_id = {entry["session_id"]: entry for entry in index}
+        assert index_by_id["old_sid"]["pre_compression_snapshot"] is True
+        assert "new_sid" not in index_by_id
         assert continuation.session_id == "new_sid"
         assert continuation.parent_session_id == "fork_parent"
         assert not continuation.pre_compression_snapshot

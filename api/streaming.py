@@ -1605,12 +1605,15 @@ def _preserve_pre_compression_snapshot(s, old_sid: str) -> None:
             existing_msgs = len(existing.get('messages') or [])
             existing_snapshot = bool(existing.get('pre_compression_snapshot'))
         except (json.JSONDecodeError, ValueError):
+            # Treat corrupt/malformed old JSON as missing history and rewrite it
+            # from the in-memory pre-compression messages below. That is safer
+            # than leaving an unreadable recovery snapshot behind.
             existing_msgs = -1
             existing_snapshot = False
         if len(s.messages) <= existing_msgs and existing_snapshot:
             return
         if len(s.messages) > existing_msgs:
-            # In-memory messages are newer than the file — save the full old
+            # In-memory messages are newer than the file; save the full old
             # snapshot from the current session object while preserving its
             # pre-existing parent_session_id lineage.
             saved_sid = s.session_id

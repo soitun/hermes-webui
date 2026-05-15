@@ -10,7 +10,7 @@
 
 ### Fixed
 
-- **PR #2285** by @dso2ng (refs #2230) — Context-compression preservation now marks old pre-compression session files with `pre_compression_snapshot: true` and hides those preserved snapshots from the active sidebar list while keeping the JSON files available for lineage traversal. This keeps long-running conversations from accumulating duplicate active sidebar rows after repeated compressions without reusing the manual archive flag for an internal snapshot lifecycle state.
+- **PR #2285** by @dso2ng (refs #2230) - Context-compression preservation now marks old pre-compression session files with `pre_compression_snapshot: true` and hides those preserved snapshots from the active sidebar list while keeping the JSON files available for lineage traversal. This keeps long-running conversations from accumulating duplicate active sidebar rows after repeated compressions without reusing the manual archive flag for an internal snapshot lifecycle state.
 
 ## [v0.51.64] — 2026-05-14 — Release AN (stage-357 — 3-PR small batch — docker_init k8s whoami fallback + PWA manifest session routes (closes #2226) + aux title test coverage)
 
