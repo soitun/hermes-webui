@@ -10,6 +10,8 @@
 
 - **PR #2337** by @Michaelyklam (closes #2336) — Pre-compression snapshot preservation now also clears stale runtime stream fields when the existing on-disk snapshot is already as complete as the in-memory session. This keeps the load-and-mark branch aligned with the full-save branch and adds regression coverage so archived parent snapshots cannot retain stale `active_stream_id` / `pending_*` state.
 
+- **PR #2342** by @franksong2702 (fixes #2341) — Reattaching to an active streaming session now keeps the user prompt that started the running turn visible. Pre-fix, reload/session-switch restore could hydrate from the browser's INFLIGHT stream cache while the backend still held the initiating prompt only as `pending_user_message`, so the transcript showed assistant Thinking/Tool activity without the user's just-submitted message. The restore path now merges that pending user row into the live transcript before rendering and updates the INFLIGHT cache, while duplicate suppression checks the current message array so final session payloads do not show the prompt twice.
+
 - **PR #2322** by @Michaelyklam (refs #2271) — LAN Ollama models selected from endpoint-discovered `custom:<host>-<port>` / `custom:<host>:<port>` picker entries now route through the configured `ollama` provider and base URL instead of surfacing a missing `CUSTOM_*_API_KEY` error. The picker still surfaces endpoint-discovered entries; the fix is to recognize them as UI routing hints matching the configured local-server base URL and resolve them via the actual `ollama` provider.
 
 
