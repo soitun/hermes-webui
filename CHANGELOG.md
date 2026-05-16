@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [v0.51.71] — 2026-05-16 — Release AU (stage-364 — 3-PR batch — #2349 stale-stream cleanup non-touching + #2343 profiles vs workspaces help card + #2283 run-event journal replay [refs #1925 RFC slice 1])
+
+### Added
+
+- **PR #2343** by @Michaelyklam (refs #2147) — The Profiles panel now includes an inline "Profiles vs workspaces" explainer. The copy clarifies that profiles control how the agent works — identity, memory, skills, model/provider config, and tools — while workspaces control what project/files a session operates on, making the OpenClaw-style role/profile mental model easier to map onto Hermes WebUI.
+
+- **PR #2283** by @franksong2702 (refs #1925) — Adds an append-only WebUI run event journal for browser-originated chat streams (refs #1925). Every SSE event emitted by the legacy in-process runner is mirrored to a per-session JSONL file, `/api/chat/stream/status` reports when replay is available for a dead stream, `/api/chat/stream` can replay journaled events with SSE event IDs and a clear stale-restart diagnostic, and the frontend reattach path uses that replay before clearing local running state. Reconnect replay uses the last rendered SSE event id as its `after_seq` cursor so it does not replay already-rendered events, and journal fsync defaults to terminal events only (`HERMES_WEBUI_RUN_JOURNAL_FSYNC=eager` restores per-event fsync). This is the first compatibility slice only: it preserves the existing WebUI runner and does not make active execution survive a WebUI restart.
+
+### Fixed
+
+- **PR #2349** by @franksong2702 (fixes #2345) — Clearing stale stream runtime flags no longer refreshes a session's `updated_at`, so old compressed continuations should not jump back to the top of the sidebar just because WebUI repaired a dead `active_stream_id` during a read/list request.
+
 ## [v0.51.70] — 2026-05-16 — Release AS (stage-363 — 4-PR snapshot+journal+UI batch — #2337 compression snapshot runtime-clear + #2334 turn-journal fcntl lock + #2342 INFLIGHT reattach pending row + #2339 workspace panel edge toggle)
 
 ### Added
@@ -20,15 +32,9 @@
 
 ### Added
 
-- **PR #2343** by @Michaelyklam (refs #2147) — The Profiles panel now includes an inline "Profiles vs workspaces" explainer. The copy clarifies that profiles control how the agent works — identity, memory, skills, model/provider config, and tools — while workspaces control what project/files a session operates on, making the OpenClaw-style role/profile mental model easier to map onto Hermes WebUI.
-
 - **PR #2332** by @Michaelyklam (refs #2290) — Cron run history/output cards now surface token/cost metadata when the underlying cron output markdown includes it. The backend parses optional model/token/cost/duration frontmatter from cron output files and returns it from `/api/crons/history` and `/api/crons/run`; the Tasks panel renders a compact usage strip beside run rows and below expanded output without affecting older outputs that lack usage metadata.
 
-- Adds an append-only WebUI run event journal for browser-originated chat streams (refs #1925). Every SSE event emitted by the legacy in-process runner is mirrored to a per-session JSONL file, `/api/chat/stream/status` reports when replay is available for a dead stream, `/api/chat/stream` can replay journaled events with SSE event IDs and a clear stale-restart diagnostic, and the frontend reattach path uses that replay before clearing local running state. Reconnect replay uses the last rendered SSE event id as its `after_seq` cursor so it does not replay already-rendered events, and journal fsync defaults to terminal events only (`HERMES_WEBUI_RUN_JOURNAL_FSYNC=eager` restores per-event fsync). This is the first compatibility slice only: it preserves the existing WebUI runner and does not make active execution survive a WebUI restart.
-
 ### Fixed
-
-- **PR TBD** by @franksong2702 — Clearing stale stream runtime flags no longer refreshes a session's `updated_at`, so old compressed continuations should not jump back to the top of the sidebar just because WebUI repaired a dead `active_stream_id` during a read/list request.
 
 - **PR #2322** by @Michaelyklam (refs #2271) — LAN Ollama models selected from endpoint-discovered `custom:<host>-<port>` / `custom:<host>:<port>` picker entries now route through the configured `ollama` provider and base URL instead of surfacing a missing `CUSTOM_*_API_KEY` error. The picker still surfaces endpoint-discovered entries; the fix is to recognize them as UI routing hints matching the configured local-server base URL and resolve them via the actual `ollama` provider.
 
