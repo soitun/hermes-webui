@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- **Issue #2341** by @franksong2702 — Reattaching to an active streaming session now keeps the user prompt that started the running turn visible. Pre-fix, reload/session-switch restore could hydrate from the browser's INFLIGHT stream cache while the backend still held the initiating prompt only as `pending_user_message`, so the transcript showed assistant Thinking/Tool activity without the user's just-submitted message. The restore path now merges that pending user row into the live transcript before rendering and updates the INFLIGHT cache, while duplicate suppression checks the current message array so final session payloads do not show the prompt twice.
+
 - **PR #2322** by @Michaelyklam (refs #2271) — LAN Ollama models selected from endpoint-discovered `custom:<host>-<port>` / `custom:<host>:<port>` picker entries now route through the configured `ollama` provider and base URL instead of surfacing a missing `CUSTOM_*_API_KEY` error. The picker still surfaces endpoint-discovered entries; the fix is to recognize them as UI routing hints matching the configured local-server base URL and resolve them via the actual `ollama` provider.
 
 
