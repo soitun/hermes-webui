@@ -3,6 +3,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Compression parent sessions are no longer repaired as stale interrupted turns when a continuation already exists, preventing false "Response interrupted" markers and hidden continuation rows after auto-compression session rotation. (Refs #2361)
+
 ## [v0.51.152] — 2026-05-28 — Release DX (stage-batch34 — single-PR optional gateway-backed browser chat)
 
 ### Added

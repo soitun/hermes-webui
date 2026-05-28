@@ -5197,6 +5197,14 @@ def _run_agent_streaming(
                     # the write when the file already contains up-to-date data
                     # (i.e. it was just saved by a checkpoint).
                     _preserve_pre_compression_snapshot(s, old_sid)
+                    # The continuation is the live/tip session, not another archived
+                    # snapshot. If the in-memory object was itself loaded from a
+                    # pre-compression snapshot (possible on repeated compression chains
+                    # or stale-cache repair paths), _preserve_pre_compression_snapshot()
+                    # intentionally restores that old flag; clear it before saving the
+                    # new continuation so sidebar/discoverability code does not hide the
+                    # session that owns the completed turn.
+                    s.pre_compression_snapshot = False
                     # Always link the continuation session to its immediate predecessor
                     # (the preserved snapshot).  This OVERRIDES any prior
                     # parent_session_id because the new continuation IS the next link
