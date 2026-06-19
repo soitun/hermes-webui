@@ -1,0 +1,42 @@
+Connected to ws://localhost:9222/devtools/page/3CC47AC2E288A6FE8670B6C1EAD90117
+Window bounds: {'left': -6, 'top': -6, 'width': 1720, 'height': 926, 'windowState': 'maximized'}
+Messages element: {'left': 348, 'top': 38.88888931274414, 'right': 1706.2222900390625, 'bottom': 674.9375343322754, 'width': 1358.2222900390625, 'height': 636.0486450195312, 'clientWidth': 1348, 'scrollHeight': 358441, 'scrollTop': 317723.5625, 'scrollbarWidth': 10, 'dpr': 2.25, 'innerWidth': 1707, 'innerHeight': 791}
+DPR=2.25, chrome header: 135px CSS
+Viewport origin CSS: (7, 129)
+Scrollbar screen X: 3837, track Y: 423-1764
+
+Pre-drag scrollTop: 0
+
+=== Native Scrollbar Drag via SendInput ===
+  Mouse down at (3837, 453)
+  _scrollbarDragActive after native pointerdown: True
+  Step 1/12: screen_y=562, scrollTop=556.4444580078125
+  Step 2/12: screen_y=671, scrollTop=1670.6666259765625
+  Step 3/12: screen_y=781, scrollTop=3339.5556640625
+  Step 4/12: screen_y=890, scrollTop=4521.77783203125
+  Step 5/12: screen_y=999, scrollTop=5158.22216796875
+  Step 6/12: screen_y=1108, scrollTop=6757.77783203125
+  Step 7/12: screen_y=1218, scrollTop=7540
+  Step 8/12: screen_y=1327, scrollTop=9349.3330078125
+  Step 9/12: screen_y=1436, scrollTop=10461.77734375
+  Step 10/12: screen_y=1545, scrollTop=11644.888671875
+  Step 11/12: screen_y=1655, scrollTop=12757.3330078125
+  Step 12/12: screen_y=1764, scrollTop=13522.6669921875
+  _scrollbarDragActive after release: False
+
+=== RESULTS ===
+  Total scroll delta: 13522.6669921875px
+  Monotonic steps: 11/11
+  Reversals: 0
+  Flag set during drag: True
+  Flag cleared after release: True
+  Content nodes: 53, blanks: 0
+
+==================================================
+  PASS: T1 Native drag moved scroll
+  PASS: T2 Monotonic scrolling
+  PASS: T3 No blank content after release
+  PASS: T4 Flag lifecycle (set during, cleared after)
+
+  ALL PASS: True
+==================================================

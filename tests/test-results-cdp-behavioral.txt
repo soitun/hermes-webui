@@ -1,0 +1,30 @@
+Connecting to ws://localhost:9222/devtools/page/3CC47AC2E288A6FE8670B6C1EAD90117
+
+=== T1: Flag initial state ===
+  PASS: flag starts as false
+
+=== T2: Pointerdown on scrollbar area ===
+  PASS: scrollbar click activates flag
+
+=== T3: Pointerdown on content area ===
+  PASS: content click does not activate flag
+
+=== T4: Pointerup clears flag ===
+  PASS: pointerup clears flag
+
+=== T5: Pointercancel clears flag ===
+  PASS: pointercancel clears flag
+
+=== T6: Spacer-only path ===
+  PASS: spacers present (before=315848px, after=13747px)
+
+=== T7: DOM stability during drag (render suppression) ===
+  PASS: children preserved (65 -> 65)
+
+=== T8: Full render after drag release ===
+  PASS: content rendered after drag release
+
+==================================================
+RESULTS: 8 passed, 0 failed, 8 total
+==================================================
+ALL CDP BEHAVIORAL TESTS PASSED

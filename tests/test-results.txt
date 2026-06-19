@@ -1,0 +1,65 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.15, pytest-9.0.3, pluggy-1.6.0 -- C:\Apps\hermes\hermes-agent\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\Repos\hermes-webui-pr-4346-vscroll-footer-jitter
+configfile: pytest.ini
+plugins: anyio-4.12.1, langsmith-0.8.14, shard-0.1.2, timeout-2.4.0
+collecting ... collected 48 items
+Running 48 items in this shard: tests/test_issue4346_vscroll_footer_jitter.py::test_js_recycle_flag_exists, tests/test_issue4346_vscroll_footer_jitter.py::test_js_recycle_stash_exists, tests/test_issue4346_vscroll_footer_jitter.py::test_js_recycle_flag_lifecycle, tests/test_issue4346_vscroll_footer_jitter.py::test_js_stash_populated_before_wipe, tests/test_issue4346_vscroll_footer_jitter.py::test_assistant_turn_uses_recycle_key_not_msg_idx, tests/test_issue4346_vscroll_footer_jitter.py::test_no_stale_raf_settimeout_clear_pattern, tests/test_issue4346_vscroll_footer_jitter.py::TestBug1MeasurementSelectorCollision::test_measurement_returns_segment_height_not_turn_height, tests/test_issue4346_vscroll_footer_jitter.py::TestBug1MeasurementSelectorCollision::test_measurement_accumulates_tool_siblings, tests/test_issue4346_vscroll_footer_jitter.py::TestBug1MeasurementSelectorCollision::test_measurement_on_buggy_turn_container_returns_wrong_height, tests/test_issue4346_vscroll_footer_jitter.py::TestBug2TypeCheckRecycling::test_user_branch_rejects_assistant_turn_node, tests/test_issue4346_vscroll_footer_jitter.py::TestBug2TypeCheckRecycling::test_assistant_branch_rejects_user_row_node, tests/test_issue4346_vscroll_footer_jitter.py::TestBug3ProgrammaticScrollStuckFlag::test_defer_clear_debounces_and_clears_flag, tests/test_issue4346_vscroll_footer_jitter.py::TestBug3ProgrammaticScrollStuckFlag::test_defer_clear_second_call_cancels_first, tests/test_issue4346_vscroll_footer_jitter.py::TestBug3ProgrammaticScrollStuckFlag::test_scroll_handler_safety_valve_in_source, tests/test_issue4346_vscroll_footer_jitter.py::TestBug3ProgrammaticScrollStuckFlag::test_safety_valve_clears_stale_flag, tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_stash_populates_from_recycle_key_and_msg_idx, tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_stash_excludes_live_assistant_turn, tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_stash_excludes_nested_live_assistant_turn, tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_full_recycle_cycle_user_row, tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_full_recycle_cycle_assistant_turn, tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_cross_type_stash_collision_rejected, tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_recycling_disabled_when_flag_false, tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_recycle_key_does_not_pollute_measurement_selector, tests/test_issue4346_vscroll_footer_jitter.py::TestContentSkipOptimization::test_unchanged_content_skips_innerhtml_update, tests/test_issue4346_vscroll_footer_jitter.py::TestContentSkipOptimization::test_changed_content_updates_innerhtml, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragDetection::test_scrollbar_drag_flag_declared, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragDetection::test_pointerdown_sets_flag_when_on_scrollbar, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragDetection::test_pointerdown_guard_exists_in_source, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragDetection::test_pointerup_clears_flag_and_triggers_render, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragDetection::test_pointercancel_clears_flag, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragRenderDuringDrag::test_drag_guard_exists_in_render_scheduler, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragRenderDuringDrag::test_drag_path_uses_full_render, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragRenderDuringDrag::test_drag_path_sets_programmatic_scroll, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragRenderDuringDrag::test_release_uses_same_render_path, tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF1MeasurementCorruption::test_mf1_multi_segment_turn_raw_heights, tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF1MeasurementCorruption::test_mf1_buggy_path_inflates_height, tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF1MeasurementCorruption::test_mf1_queryselector_returns_segment_not_container, tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF2CrossTypeCollision::test_mf2_user_row_in_assistant_slot_without_guard, tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF2CrossTypeCollision::test_mf2_assistant_turn_in_user_slot_without_guard, tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF2CrossTypeCollision::test_mf2_stash_collision_rate_in_shifted_indices, tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF3TestSensitivity::test_mf3_measurement_test_fails_on_buggy_layout, tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF3TestSensitivity::test_mf3_type_check_test_fails_on_unguarded_code, tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF3TestSensitivity::test_mf3_recycle_key_separation_prevents_selector_collision, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragFullRender::test_drag_path_calls_compensate_scroll, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragFullRender::test_drag_path_sets_programmatic_scroll, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragFullRender::test_drag_path_no_spacer_only_update, tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragFullRender::test_drag_path_updates_window_key, tests/test_issue4346_vscroll_footer_jitter.py::TestStashKeyCoercion::test_string_dataset_matches_numeric_lookup
+
+tests/test_issue4346_vscroll_footer_jitter.py::test_js_recycle_flag_exists PASSED [  2%]
+tests/test_issue4346_vscroll_footer_jitter.py::test_js_recycle_stash_exists PASSED [  4%]
+tests/test_issue4346_vscroll_footer_jitter.py::test_js_recycle_flag_lifecycle PASSED [  6%]
+tests/test_issue4346_vscroll_footer_jitter.py::test_js_stash_populated_before_wipe PASSED [  8%]
+tests/test_issue4346_vscroll_footer_jitter.py::test_assistant_turn_uses_recycle_key_not_msg_idx PASSED [ 10%]
+tests/test_issue4346_vscroll_footer_jitter.py::test_no_stale_raf_settimeout_clear_pattern PASSED [ 12%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestBug1MeasurementSelectorCollision::test_measurement_returns_segment_height_not_turn_height PASSED [ 14%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestBug1MeasurementSelectorCollision::test_measurement_accumulates_tool_siblings PASSED [ 16%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestBug1MeasurementSelectorCollision::test_measurement_on_buggy_turn_container_returns_wrong_height PASSED [ 18%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestBug2TypeCheckRecycling::test_user_branch_rejects_assistant_turn_node PASSED [ 20%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestBug2TypeCheckRecycling::test_assistant_branch_rejects_user_row_node PASSED [ 22%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestBug3ProgrammaticScrollStuckFlag::test_defer_clear_debounces_and_clears_flag PASSED [ 25%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestBug3ProgrammaticScrollStuckFlag::test_defer_clear_second_call_cancels_first PASSED [ 27%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestBug3ProgrammaticScrollStuckFlag::test_scroll_handler_safety_valve_in_source PASSED [ 29%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestBug3ProgrammaticScrollStuckFlag::test_safety_valve_clears_stale_flag PASSED [ 31%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_stash_populates_from_recycle_key_and_msg_idx PASSED [ 33%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_stash_excludes_live_assistant_turn PASSED [ 35%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_stash_excludes_nested_live_assistant_turn PASSED [ 37%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_full_recycle_cycle_user_row PASSED [ 39%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_full_recycle_cycle_assistant_turn PASSED [ 41%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_cross_type_stash_collision_rejected PASSED [ 43%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_recycling_disabled_when_flag_false PASSED [ 45%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestRecycleStashIntegration::test_recycle_key_does_not_pollute_measurement_selector PASSED [ 47%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestContentSkipOptimization::test_unchanged_content_skips_innerhtml_update PASSED [ 50%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestContentSkipOptimization::test_changed_content_updates_innerhtml PASSED [ 52%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragDetection::test_scrollbar_drag_flag_declared PASSED [ 54%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragDetection::test_pointerdown_sets_flag_when_on_scrollbar PASSED [ 56%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragDetection::test_pointerdown_guard_exists_in_source PASSED [ 58%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragDetection::test_pointerup_clears_flag_and_triggers_render PASSED [ 60%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragDetection::test_pointercancel_clears_flag PASSED [ 62%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragRenderDuringDrag::test_drag_guard_exists_in_render_scheduler PASSED [ 64%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragRenderDuringDrag::test_drag_path_uses_full_render PASSED [ 66%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragRenderDuringDrag::test_drag_path_sets_programmatic_scroll PASSED [ 68%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragRenderDuringDrag::test_release_uses_same_render_path PASSED [ 70%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF1MeasurementCorruption::test_mf1_multi_segment_turn_raw_heights PASSED [ 72%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF1MeasurementCorruption::test_mf1_buggy_path_inflates_height PASSED [ 75%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF1MeasurementCorruption::test_mf1_queryselector_returns_segment_not_container PASSED [ 77%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF2CrossTypeCollision::test_mf2_user_row_in_assistant_slot_without_guard PASSED [ 79%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF2CrossTypeCollision::test_mf2_assistant_turn_in_user_slot_without_guard PASSED [ 81%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF2CrossTypeCollision::test_mf2_stash_collision_rate_in_shifted_indices PASSED [ 83%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF3TestSensitivity::test_mf3_measurement_test_fails_on_buggy_layout PASSED [ 85%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF3TestSensitivity::test_mf3_type_check_test_fails_on_unguarded_code PASSED [ 87%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestMaintainerMF3TestSensitivity::test_mf3_recycle_key_separation_prevents_selector_collision PASSED [ 89%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragFullRender::test_drag_path_calls_compensate_scroll PASSED [ 91%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragFullRender::test_drag_path_sets_programmatic_scroll PASSED [ 93%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragFullRender::test_drag_path_no_spacer_only_update PASSED [ 95%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestScrollbarDragFullRender::test_drag_path_updates_window_key PASSED [ 97%]
+tests/test_issue4346_vscroll_footer_jitter.py::TestStashKeyCoercion::test_string_dataset_matches_numeric_lookup PASSED [100%]
+
+============================== warnings summary ===============================
+tests/test_issue4346_vscroll_footer_jitter.py::test_js_recycle_flag_exists
+  C:\Apps\hermes\hermes-agent\venv\Lib\site-packages\discord\player.py:30: DeprecationWarning: 'audioop' is deprecated and slated for removal in Python 3.13
+    import audioop
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 48 passed, 1 warning in 6.45s ========================

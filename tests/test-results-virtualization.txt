@@ -1,0 +1,46 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.15, pytest-9.0.3, pluggy-1.6.0 -- C:\Apps\hermes\hermes-agent\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\Repos\hermes-webui-pr-4346-vscroll-footer-jitter
+configfile: pytest.ini
+plugins: anyio-4.12.1, langsmith-0.8.14, shard-0.1.2, timeout-2.4.0
+collecting ... collected 29 items
+Running 29 items in this shard: tests/test_issue500_message_list_virtualization.py::test_message_virtual_window_virtualizes_older_history_but_keeps_recent_tail, tests/test_issue500_message_list_virtualization.py::test_message_virtual_window_collapses_to_tail_only_near_bottom, tests/test_issue500_message_list_virtualization.py::test_render_messages_uses_virtual_window_and_spacer_measurement_path, tests/test_issue500_message_list_virtualization.py::test_measurement_uses_one_primary_row_and_adjacent_activity_siblings_only, tests/test_issue500_message_list_virtualization.py::test_virtual_keep_tail_count_stays_bounded_after_history_expands_render_window, tests/test_issue500_message_list_virtualization.py::test_virtual_prepended_height_delta_uses_prefix_cache_only_when_virtualized, tests/test_issue500_message_list_virtualization.py::test_virtual_question_jump_scroll_target_uses_visible_index_height_prefix, tests/test_issue500_message_list_virtualization.py::test_height_cache_preserves_measured_prefix_across_append_only_growth, tests/test_issue500_message_list_virtualization.py::test_height_cache_preserves_measured_suffix_across_prepended_history, tests/test_issue500_message_list_virtualization.py::test_measurement_refresh_budget_is_keyed_to_window_shape_not_pad_height, tests/test_issue500_message_list_virtualization.py::test_tool_rows_do_not_carry_message_measurement_hook, tests/test_issue500_message_list_virtualization.py::test_viewport_intersection_helper_detects_visible_rendered_rows_only, tests/test_issue500_message_list_virtualization.py::test_render_messages_has_one_shot_virtual_blank_viewport_fallback, tests/test_issue500_message_list_virtualization.py::test_virtual_blank_viewport_recovery_evicts_stale_cache_before_fallback, tests/test_issue500_message_list_virtualization.py::test_same_frame_restore_nudges_virtual_window_when_anchor_row_is_missing, tests/test_issue500_message_list_virtualization.py::test_virtualize_transcript_opt_out_forces_full_render_window, tests/test_issue500_message_list_virtualization.py::test_virtualize_transcript_gate_present_in_current_window_fn, tests/test_issue500_message_list_virtualization.py::test_message_virtual_default_height_for_role_returns_correct_heights, tests/test_issue500_message_list_virtualization.py::test_message_virtual_role_for_entry_classifies_tool_calls, tests/test_issue500_message_list_virtualization.py::test_message_virtual_window_with_role_for_idx_uses_role_defaults, tests/test_issue500_message_list_virtualization.py::test_message_virtual_window_cached_heights_override_role_defaults, tests/test_issue500_message_list_virtualization.py::test_offset_helpers_use_per_role_defaults_for_uncached_rows, tests/test_issue500_message_list_virtualization.py::test_compensate_scroll_for_measurement_delta_no_anchor_does_not_throw, tests/test_issue500_message_list_virtualization.py::test_compensate_scroll_for_measurement_delta_shifts_scroll_when_anchor_moves, tests/test_issue500_message_list_virtualization.py::test_compensate_scroll_for_measurement_delta_skips_small_delta, tests/test_issue500_message_list_virtualization.py::test_compensate_scroll_for_measurement_delta_sets_programmatic_scroll_flag, tests/test_issue500_message_list_virtualization.py::test_virtualized_render_uses_compensation_helper, tests/test_issue500_message_list_virtualization.py::test_scroll_listener_guards_programmatic_scroll_before_marking_active, tests/test_issue500_message_list_virtualization.py::test_clear_height_cache_resets_scroll_settle_globals
+
+tests/test_issue500_message_list_virtualization.py::test_message_virtual_window_virtualizes_older_history_but_keeps_recent_tail PASSED [  3%]
+tests/test_issue500_message_list_virtualization.py::test_message_virtual_window_collapses_to_tail_only_near_bottom PASSED [  6%]
+tests/test_issue500_message_list_virtualization.py::test_render_messages_uses_virtual_window_and_spacer_measurement_path PASSED [ 10%]
+tests/test_issue500_message_list_virtualization.py::test_measurement_uses_one_primary_row_and_adjacent_activity_siblings_only PASSED [ 13%]
+tests/test_issue500_message_list_virtualization.py::test_virtual_keep_tail_count_stays_bounded_after_history_expands_render_window PASSED [ 17%]
+tests/test_issue500_message_list_virtualization.py::test_virtual_prepended_height_delta_uses_prefix_cache_only_when_virtualized PASSED [ 20%]
+tests/test_issue500_message_list_virtualization.py::test_virtual_question_jump_scroll_target_uses_visible_index_height_prefix PASSED [ 24%]
+tests/test_issue500_message_list_virtualization.py::test_height_cache_preserves_measured_prefix_across_append_only_growth PASSED [ 27%]
+tests/test_issue500_message_list_virtualization.py::test_height_cache_preserves_measured_suffix_across_prepended_history PASSED [ 31%]
+tests/test_issue500_message_list_virtualization.py::test_measurement_refresh_budget_is_keyed_to_window_shape_not_pad_height PASSED [ 34%]
+tests/test_issue500_message_list_virtualization.py::test_tool_rows_do_not_carry_message_measurement_hook PASSED [ 37%]
+tests/test_issue500_message_list_virtualization.py::test_viewport_intersection_helper_detects_visible_rendered_rows_only PASSED [ 41%]
+tests/test_issue500_message_list_virtualization.py::test_render_messages_has_one_shot_virtual_blank_viewport_fallback PASSED [ 44%]
+tests/test_issue500_message_list_virtualization.py::test_virtual_blank_viewport_recovery_evicts_stale_cache_before_fallback PASSED [ 48%]
+tests/test_issue500_message_list_virtualization.py::test_same_frame_restore_nudges_virtual_window_when_anchor_row_is_missing PASSED [ 51%]
+tests/test_issue500_message_list_virtualization.py::test_virtualize_transcript_opt_out_forces_full_render_window PASSED [ 55%]
+tests/test_issue500_message_list_virtualization.py::test_virtualize_transcript_gate_present_in_current_window_fn PASSED [ 58%]
+tests/test_issue500_message_list_virtualization.py::test_message_virtual_default_height_for_role_returns_correct_heights PASSED [ 62%]
+tests/test_issue500_message_list_virtualization.py::test_message_virtual_role_for_entry_classifies_tool_calls PASSED [ 65%]
+tests/test_issue500_message_list_virtualization.py::test_message_virtual_window_with_role_for_idx_uses_role_defaults PASSED [ 68%]
+tests/test_issue500_message_list_virtualization.py::test_message_virtual_window_cached_heights_override_role_defaults PASSED [ 72%]
+tests/test_issue500_message_list_virtualization.py::test_offset_helpers_use_per_role_defaults_for_uncached_rows PASSED [ 75%]
+tests/test_issue500_message_list_virtualization.py::test_compensate_scroll_for_measurement_delta_no_anchor_does_not_throw PASSED [ 79%]
+tests/test_issue500_message_list_virtualization.py::test_compensate_scroll_for_measurement_delta_shifts_scroll_when_anchor_moves PASSED [ 82%]
+tests/test_issue500_message_list_virtualization.py::test_compensate_scroll_for_measurement_delta_skips_small_delta PASSED [ 86%]
+tests/test_issue500_message_list_virtualization.py::test_compensate_scroll_for_measurement_delta_sets_programmatic_scroll_flag PASSED [ 89%]
+tests/test_issue500_message_list_virtualization.py::test_virtualized_render_uses_compensation_helper PASSED [ 93%]
+tests/test_issue500_message_list_virtualization.py::test_scroll_listener_guards_programmatic_scroll_before_marking_active PASSED [ 96%]
+tests/test_issue500_message_list_virtualization.py::test_clear_height_cache_resets_scroll_settle_globals PASSED [100%]
+
+============================== warnings summary ===============================
+tests/test_issue500_message_list_virtualization.py::test_message_virtual_window_virtualizes_older_history_but_keeps_recent_tail
+  C:\Apps\hermes\hermes-agent\venv\Lib\site-packages\discord\player.py:30: DeprecationWarning: 'audioop' is deprecated and slated for removal in Python 3.13
+    import audioop
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 29 passed, 1 warning in 5.74s ========================
