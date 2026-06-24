@@ -9,12 +9,16 @@ prefixed value was saved and the cron model override broke.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[1]
 PANELS_JS = (REPO / "static" / "panels.js").read_text(encoding="utf-8")
-NODE = "/home/hermes/.local/bin/node"
+NODE = shutil.which("node")
+pytestmark = pytest.mark.skipif(NODE is None, reason="node not available")
 
 
 def _fn_body(name: str) -> str:
