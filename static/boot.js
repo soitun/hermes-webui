@@ -1029,7 +1029,10 @@ window._hermesTtsSynth=function(id, text, opts){
   // Configurable via localStorage keys (set from dev console or a future settings panel).
   //   hermes-voice-silence-ms   — pause duration before auto-send (ms, default 1800)
   //   hermes-voice-continuous   — keep mic open across natural pauses ("true"/"false", default false)
-  const SILENCE_MS=parseInt(localStorage.getItem('hermes-voice-silence-ms'))||1800;
+  const _silenceMsRaw=parseInt(localStorage.getItem('hermes-voice-silence-ms'),10);
+  // Fall back to 1800 for missing/NaN/non-positive values, and floor at 200ms so a
+  // mistyped tiny/negative value can't make the recognizer auto-send instantly.
+  const SILENCE_MS=(Number.isFinite(_silenceMsRaw)&&_silenceMsRaw>0)?Math.max(200,_silenceMsRaw):1800;
 
   function _clearBrowserTtsRecovery(){
     if(_browserTtsKeepAlive){

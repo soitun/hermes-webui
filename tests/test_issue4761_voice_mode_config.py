@@ -23,13 +23,24 @@ class TestVoiceModeSilenceMsConfig:
 
     def test_silence_ms_reads_local_storage_with_fallback(self):
         src = _boot_src()
-        m = re.search(
-            r"const\s+SILENCE_MS\s*=\s*parseInt\s*\(\s*localStorage\.getItem\s*\(\s*'hermes-voice-silence-ms'\s*\)\s*\)\s*\|\|\s*1800",
+        # Assert the BEHAVIOR (read the key, parse as int, fall back to 1800 for
+        # missing/invalid values) rather than one exact expression, so the impl
+        # can be hardened (e.g. a min-floor clamp) without a brittle test break.
+        assert re.search(
+            r"parseInt\s*\(\s*localStorage\.getItem\s*\(\s*'hermes-voice-silence-ms'\s*\)",
             src,
+        ), "SILENCE_MS must read the 'hermes-voice-silence-ms' localStorage key via parseInt."
+        # The 1800 default must remain the fallback for missing/invalid values.
+        assert re.search(r"SILENCE_MS\s*=.*\b1800\b", src), (
+            "SILENCE_MS must keep 1800 as the default fallback so behavior is "
+            "unchanged when the key is unset or invalid."
         )
-        assert m, (
-            "SILENCE_MS must be defined as `parseInt(localStorage.getItem('hermes-voice-silence-ms')) || 1800` "
-            "so users can tune it via dev console or a future settings toggle."
+        # A non-positive / mistyped value must not be honored verbatim (no instant
+        # auto-send): the value is guarded by a positivity check and/or a min floor.
+        assert "_silenceMsRaw>0" in src or "Math.max(" in src or "> 0" in src, (
+            "SILENCE_MS must guard against non-positive values (positivity check "
+            "or a Math.max floor) so a mistyped tiny/negative value can't make the "
+            "recognizer auto-send instantly."
         )
 
     def test_silence_ms_used_in_timeout(self):
