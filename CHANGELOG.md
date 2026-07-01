@@ -35,6 +35,8 @@
 
 ### Fixed
 
+- **Hardened the embedded terminal against unauthenticated access when auth is disabled.** The embedded-terminal endpoints (start / input / resize / close / output) are now gated to local-origin requests when WebUI auth is not enabled, closing an access gap on network-exposed instances. Authenticated and local use is unaffected.  (#5268)
+
 - **Docker build no longer fails when `/opt/hermes` contains a `.playwright/` directory.** The agent-source staging step now excludes `.playwright` in both the `rsync` and `cp -a` fallback paths, fixing `rsync error code 23` during the build. Thanks @enihcam. (#5316, fixes #5315)
 
 - **Reorder the chat-footer controls by dragging.** The composer footer controls (Attach, Saved prompts, Mic, Profile, Workspace, Model, Reasoning, Context, and the situational controls) can now be reordered by dragging their chips in Settings, in addition to toggling visibility. The order persists per profile and is validated/deduplicated server-side. Thanks @Paladin173. (#5075)
