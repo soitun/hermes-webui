@@ -366,6 +366,44 @@ def test_populate_model_dropdown_retries_at_most_once_even_if_refetch_is_still_e
     assert payload["optionValues"] == ["claude-sonnet-4"]
 
 
+def test_populate_model_dropdown_retries_when_synth_fallback_is_empty(driver_path):
+    payload = _run(
+        driver_path,
+        {
+            "fetchResponses": [
+                {
+                    "active_provider": "anthropic",
+                    "default_model": "claude-sonnet-4",
+                    "configured_model_badges": {
+                        "@anthropic:claude-sonnet-4": {"provider": "anthropic"},
+                    },
+                    "groups": [],
+                },
+                {
+                    "active_provider": "anthropic",
+                    "default_model": "claude-sonnet-4",
+                    "configured_model_badges": {
+                        "claude-sonnet-4": {"provider": "anthropic"},
+                    },
+                    "groups": [
+                        {
+                            "provider": "Anthropic",
+                            "provider_id": "anthropic",
+                            "models": [
+                                {"id": "claude-sonnet-4", "label": "Claude Sonnet 4"},
+                            ],
+                        }
+                    ],
+                },
+            ],
+        },
+    )
+
+    assert len(payload["fetchCalls"]) == 2
+    assert payload["fetchCalls"][1].endswith("freshness=session_visit")
+    assert payload["optionValues"] == ["claude-sonnet-4"]
+
+
 def test_populate_model_dropdown_retry_preserves_custom_redirect_handler(driver_path):
     payload = _run(
         driver_path,

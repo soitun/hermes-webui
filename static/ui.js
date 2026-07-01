@@ -2477,8 +2477,15 @@ async function populateModelDropdown(opts={}){
     const groups=usedConfiguredFallback
       ? _synthGroupsFromConfigured()
       : data.groups;
+    const willRetry=usedConfiguredFallback && requestedFreshness!=='session_visit' && !_modelCatalogFallbackRetried;
 
-    if(!groups.length) return; // no server groups and no configured fallback
+    if(!groups.length){
+      if(willRetry){
+        _modelCatalogFallbackRetried=true;
+        populateModelDropdown({...opts,freshness:'session_visit'}).catch(()=>{});
+      }
+      return; // no server groups and no configured fallback
+    }
     const previousSelection=_captureModelDropdownSelection(sel);
     // Clear existing options
     sel.innerHTML='';
@@ -2520,7 +2527,6 @@ async function populateModelDropdown(opts={}){
       renderModelDropdown();
       _positionModelDropdown();
     }
-    const willRetry=usedConfiguredFallback && requestedFreshness!=='session_visit' && !_modelCatalogFallbackRetried;
     // Kick off a background live-model fetch for the active provider.
     // This runs after the static list is already shown (no blocking flicker).
     if(data.active_provider && !willRetry) _fetchLiveModels(data.active_provider, sel, requestSeq);
