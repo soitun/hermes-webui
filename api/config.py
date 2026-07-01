@@ -3023,17 +3023,38 @@ def _candidate_supports_reasoning(candidate: str) -> bool:
     return False
 
 
+# Matches the nested Gemini gateway route prefix anywhere it appears in a
+# model id, as long as it isn't embedded inside a larger alphanumeric token
+# (the negative lookbehind excludes false positives like "notvertex/gemini-x").
+# Scanning for the pattern at any position — rather than requiring the whole
+# string to start with it — makes the check independent of how many wrapper
+# layers precede the route: ``@provider:``, a named custom-provider slug
+# (``@custom:<slug>:``), or any future nesting scheme none of us have
+# invented yet. This invariant (Gemini image/embedding routes must never
+# expose a reasoning toggle) was bypassed twice via different edge cases in
+# the prefix-stripping logic before being made structurally boundary-based
+# instead of prefix-based — see PR #5313 review history.
+_NESTED_ROUTE_PATTERN = re.compile(r"(?<![a-z0-9])(vertex/gemini-|gemini_cli/gemini-)(.*)$")
+
+
 def _nested_route_reasoning_denied(model: str) -> bool:
-    """Hard deny for nested Gemini gateway routes that must never show a reasoning toggle."""
+    """Hard deny for nested Gemini gateway routes that must never show a reasoning toggle.
+
+    Matches the route pattern anywhere in *model*, not just when the whole
+    string starts with it, so this check does not depend on a caller having
+    stripped exactly the right wrapper prefix first. Callers should still
+    pass the least-wrapped form they have (e.g. after
+    ``_strip_provider_hint_for_reasoning``) for clarity, but correctness no
+    longer hinges on it.
+    """
     lower = str(model or "").strip().lower()
     if not lower:
         return False
-    for prefix in ("vertex/gemini-", "gemini_cli/gemini-"):
-        if lower.startswith(prefix):
-            tail = lower[len(prefix) :]
-            if tail.startswith("embedding") or "image" in tail or "imagine" in tail:
-                return True
-    return False
+    match = _NESTED_ROUTE_PATTERN.search(lower)
+    if not match:
+        return False
+    tail = match.group(2)
+    return tail.startswith("embedding") or "image" in tail or "imagine" in tail
 
 
 def _nested_gateway_route_reasoning(model: str) -> bool:

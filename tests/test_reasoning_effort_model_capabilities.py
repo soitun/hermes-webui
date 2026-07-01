@@ -257,6 +257,37 @@ def test_nested_route_deny_wins_for_provider_qualified_hinted_model(monkeypatch)
             monkeypatch.setitem(cfg.cfg, "custom_providers", original)
 
 
+def test_nested_route_deny_is_boundary_based_not_prefix_based():
+    # Structural regression test for the underlying invariant, independent
+    # of any particular wrapper/strip scheme: _nested_route_reasoning_denied
+    # must catch the vertex/gemini- or gemini_cli/gemini- route no matter
+    # how many opaque wrapper layers precede it in the raw string, as long
+    # as the route starts at a non-alphanumeric boundary. This was bypassed
+    # twice via different prefix-stripping edge cases (PR #5313) before the
+    # check itself was made boundary-based instead of prefix-based, so no
+    # future wrapper scheme can reintroduce the same class of bug.
+    denied_cases = [
+        "vertex/gemini-image-1.0",
+        "vertex/gemini-embedding-001",
+        "@custom:agg:vertex/gemini-image-1.0",
+        "agg:vertex/gemini-image-1.0",  # the literal leftover fragment from the historical bug
+        "gemini_cli/gemini-imagine-2",
+        "outer:inner:vertex/gemini-image-1.0",  # hypothetical deeper future nesting
+        "@custom:outer:@custom:inner:vertex/gemini-embedding-001",
+    ]
+    for model in denied_cases:
+        assert cfg._nested_route_reasoning_denied(model) is True, model
+
+    allowed_cases = [
+        "vertex/gemini-2.5-pro",
+        "notvertex/gemini-image-1.0",  # embedded in a larger token — must NOT match
+        "somegemini_cli/gemini-image-1",  # same — embedded substring, not a boundary
+        "",
+    ]
+    for model in allowed_cases:
+        assert cfg._nested_route_reasoning_denied(model) is False, model
+
+
 def test_get_reasoning_status_includes_supported_efforts(monkeypatch):
     monkeypatch.setattr(
         cfg,
