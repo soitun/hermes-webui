@@ -3,7 +3,23 @@
 
 ## [Unreleased]
 
-_No unreleased changes. Entries are moved into their version block when a release is tagged._
+### Added
+
+- **Extensions can opt into a consent-gated loopback sidecar proxy.** An extension whose manifest declares a `127.0.0.1`/`localhost` sidecar origin can now, after an explicit per-origin user consent, have WebUI proxy same-origin browser requests to that local backend — the first supported mechanism for an extension to reach a co-located sidecar without shipping its own server route. The surface is deliberately narrow and fail-closed: loopback-only origin (no SSRF; hex/decimal/userinfo/port bypasses rejected), path traversal and URL/scheme smuggling rejected on the fully-decoded form, consent bound to the exact declared origin (an origin change forces reconsent, bounded at 512 entries), auth/CSRF-gated consent, credential isolation (Cookie/Authorization/CSRF/Host/Origin/Referer stripped outbound, Set-Cookie stripped inbound, hop-by-hop headers stripped both ways), ambient proxies disabled, redirects confined to the declared origin, a 512KB response cap on both the success and error paths, and same-origin **browser provenance required on every proxied method** (not just GET). Documented in `docs/EXTENSIONS.md`. Thanks @rodboev. (#5228, #4747)
+
+- **Push-to-talk hold gesture for dictation.** Hold the mic button (or its keyboard activation) to dictate and release to stop, in addition to the existing click-to-toggle mode — a more reliable way to capture a quick voice note. The browser-reserved `Ctrl+Shift+D` chord that an earlier draft proposed was dropped (it collides with browser bookmark shortcuts); only the page-safe hold gesture ships, and the restart/teardown paths are race-hardened so there's no stuck or zombie microphone. Thanks @rodboev. (#5310, #3700)
+
+### Fixed
+
+- **MoA (Mixture-of-Agents) overrides fail closed on gateway-backed sessions instead of silently running the wrong model.** When WebUI chat is routed through a Hermes Gateway, a per-turn MoA override can't be honored gateway-side, so the request now returns an honest `409` ("MoA override is unavailable on gateway-backed sessions") rather than quietly dropping the override and running the base model. The non-gateway MoA path is unchanged. Thanks @ruizanthony. (#5153)
+
+- **`ctl.sh` loads `~/.hermes/.env` so `${VAR}` references in `config.yaml` resolve.** The control script now reads the environment file before launching, using a literal parser (no `source`/`eval`, so it's injection-safe) that correctly handles quoted values, inline comments, and `export`-prefixed lines. Thanks @hogehou-cmi. (#5309)
+
+- **Manual title regeneration honors your configured auxiliary title-generation timeout.** The manual "regenerate title" action used the frontend's default 30s request timeout, so a slow-but-valid generation timed out on the client when `auxiliary.title_generation.timeout` was set higher. It now fetches the current timeout fresh per regen (no stale cache across profile switches) and applies it only when valid, falling back to the 30s default on any fetch failure. Thanks @Stacey2911. (#5374)
+
+- **Model-picker fixes: MoA presets and the Copilot catalog no longer clobber other providers' model allowlists.** Selecting a MoA preset now re-resolves cleanly per turn (and a malformed preset can't crash resolution), and the Copilot models-as-settings-map handling is scoped to Copilot only — so a `providers.<id>.models` allowlist on any other built-in provider (e.g. `providers.anthropic.models`, #644) is honored again instead of being silently disabled. Provider dedup/canonicalization (#1568/#2245/#2399) and the #1855 bare-model fast path are preserved. Thanks @promptclickrun. (#5301)
+
+- **No more 57–70 s cold-startup stalls from the profile skills-stats thundering herd.** At container boot the frontend fires several profile-data requests at once; with `ThreadingHTTPServer` (one thread per request) they all missed the empty skills-stats cache simultaneously and each walked + parsed every profile's skill tree, stacking thousands of concurrent `stat()` calls under Docker's overlay2 filesystem. `_get_profile_skills_stats()` now serializes per-profile with double-checked locking (concurrent misses on one profile collapse to a single compute; independent profiles still compute in parallel), and `list_profiles_api()` single-flights the row build under `_LIST_PROFILES_CACHE_LOCK` so one thread builds while the rest wait for the cached result. The every-call cheap mtime probe (the #4783 out-of-band change-detection contract) is unchanged. (#5364)
 
 ## [v0.51.792] — 2026-07-01
 
