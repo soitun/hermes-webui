@@ -10964,20 +10964,10 @@ function _renderLiveAnchorActivitySceneTransparent(streamId, scene, opts){
     targetRenderedRows.push(renderedNode);
     wrote=true;
   }
-  const transparentLiveRowNextSibling=(node)=>{
-    if(!node) return null;
-    if(typeof node.nextSibling!=='undefined') return node.nextSibling;
-    const parent=node.parentElement||node.parentNode;
-    if(parent&&parent.children&&typeof parent.children.length==='number'){
-      const index=Array.prototype.indexOf.call(parent.children,node);
-      return index>=0 ? (parent.children[index+1]||null) : null;
-    }
-    return null;
-  };
   const transparentLiveRowAlreadyPositioned=(node, expectedNextSibling)=>!!(
     node &&
     node.parentElement===blocks &&
-    transparentLiveRowNextSibling(node)===expectedNextSibling
+    node.nextSibling===expectedNextSibling
   );
   let expectedNextSibling=(liveFooter&&liveFooter.parentElement===blocks) ? liveFooter : null;
   for(let i=targetRenderedRows.length-1;i>=0;i--){
