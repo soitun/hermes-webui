@@ -11043,6 +11043,7 @@ function _renderLiveAnchorActivitySceneTransparent(streamId, scene, opts){
   });
   const liveFooter=blocks.querySelector('#liveRunStatus');
   let wrote=false;
+  const targetRenderedRows=[];
   for(const row of rows){
     const node=_anchorSceneTransparentNodeForRow(row,{
       live:true,
@@ -11058,9 +11059,24 @@ function _renderLiveAnchorActivitySceneTransparent(streamId, scene, opts){
       : node;
     if(existing) preserveByKey.delete(key);
     if(!renderedNode) continue;
-    if(liveFooter&&liveFooter.parentElement===blocks) blocks.insertBefore(renderedNode,liveFooter);
-    else blocks.appendChild(renderedNode);
+    targetRenderedRows.push(renderedNode);
     wrote=true;
+  }
+  const transparentLiveRowAlreadyPositioned=(node, expectedNextSibling)=>!!(
+    node &&
+    node.parentElement===blocks &&
+    node.nextSibling===expectedNextSibling
+  );
+  let expectedNextSibling=(liveFooter&&liveFooter.parentElement===blocks) ? liveFooter : null;
+  for(let i=targetRenderedRows.length-1;i>=0;i--){
+    const renderedNode=targetRenderedRows[i];
+    if(transparentLiveRowAlreadyPositioned(renderedNode,expectedNextSibling)){
+      expectedNextSibling=renderedNode;
+      continue;
+    }
+    if(expectedNextSibling&&expectedNextSibling.parentElement===blocks) blocks.insertBefore(renderedNode,expectedNextSibling);
+    else blocks.appendChild(renderedNode);
+    expectedNextSibling=renderedNode;
   }
   preserveByKey.forEach(stale=>stale.remove());
   if(wrote) _syncTransparentEventControls(turn);
@@ -11127,6 +11143,7 @@ function _rehydrateTransparentLiveRow(existing, node, preservedState){
   if(!existing) return;
   if(node && Object.prototype.hasOwnProperty.call(node, '_tcData')) existing._tcData = node._tcData;
   else if(Object.prototype.hasOwnProperty.call(existing, '_tcData')) delete existing._tcData;
+  try{ delete node._tcData; }catch(_){}
   const header = existing.querySelector ? existing.querySelector('.tool-card-header,.thinking-card-header') : null;
   if(header){
     if(typeof _wireTransparentHeaderToggle === 'function') _wireTransparentHeaderToggle(header);
@@ -11147,6 +11164,26 @@ function _rehydrateTransparentLiveRow(existing, node, preservedState){
   }
 }
 
+function _refreshTransparentThinkingLiveRow(existing, node){
+  if(!existing || !node || !existing.querySelector || !node.querySelector) return false;
+  const existingType = String(existing.getAttribute('data-event-type') || '');
+  const nodeType = String(node.getAttribute('data-event-type') || '');
+  const existingIsThinking = existingType === 'thinking' || (existing.classList&&existing.classList.contains('transparent-thinking-event'));
+  const nodeIsThinking = nodeType === 'thinking' || (node.classList&&node.classList.contains('transparent-thinking-event'));
+  if(!existingIsThinking || !nodeIsThinking) return false;
+  const existingPre = existing.querySelector('.thinking-card-body pre');
+  const nodePre = node.querySelector('.thinking-card-body pre');
+  if(!existingPre || !nodePre) return false;
+  const nextText = String(nodePre.textContent || '');
+  if(existingPre.textContent !== nextText) existingPre.textContent = nextText;
+  const nodePreview = node.querySelector('.transparent-event-thinking-preview');
+  const previewText = nodePreview ? String(nodePreview.textContent || '') : nextText;
+  if(typeof _decorateTransparentEventRow === 'function'){
+    _decorateTransparentEventRow(existing,{type:'thinking',text:nextText,preview:previewText});
+  }
+  return true;
+}
+
 function _refreshTransparentLiveRow(existing, node){
   if(!existing || !node || !existing.getAttribute) return node;
   if(existing===node) return existing;
@@ -11165,7 +11202,13 @@ function _refreshTransparentLiveRow(existing, node){
     existing.setAttribute(name, value);
   }
   existing.className = node.className || '';
-  existing.innerHTML = node.innerHTML || '';
+  if(_refreshTransparentThinkingLiveRow(existing, node)){
+    _rehydrateTransparentLiveRow(existing, node, preservedState);
+    return existing;
+  }
+  const newHtml = node.innerHTML || '';
+  const htmlChanged = existing.innerHTML !== newHtml;
+  if(htmlChanged) existing.innerHTML = newHtml;
   _rehydrateTransparentLiveRow(existing, node, preservedState);
   return existing;
 }
