@@ -165,14 +165,19 @@ def test_stream_fade_uses_incremental_renderer_without_changing_default_path():
         [
             "_streamFadeNextText(displayText)",
             "if(!next.changed) return next.caughtUp",
+            "if(!_shouldUseTransparentStreamFade())",
+            "_smdNewParser(assistantBody,true)",
+            "_smdWrite(next.text,true)",
+            "_sanitizeSmdLinks(assistantBody)",
             "_streamFadeBindCleanup(assistantBody)",
             "_streamFadeAppendText(assistantBody,delta)",
             "_streamFadeDomText=String(next.text||'')",
             "stream-fade-active",
         ],
     )
-    assert "_smdWrite(next.text,true)" not in render_block
-    assert "innerHTML" not in render_block
+    assert render_block.index("_smdWrite(next.text,true)") < render_block.index(
+        "_streamFadeAppendText(assistantBody,delta)"
+    )
     append_block = function_block(MESSAGES_JS, "_streamFadeAppendText")
     assert_contains_all(
         append_block,
@@ -272,29 +277,36 @@ def test_transparent_anchor_prose_uses_fade_renderer_when_enabled():
         predicate_block,
         [
             "_shouldUseStreamFade()",
-            "typeof isTransparentStream==='function'&&isTransparentStream()",
+            "_shouldUseTransparentStreamFade()",
         ],
     )
+    assert "function _shouldUseTransparentStreamFade()" in MESSAGES_JS
+    assert "typeof isTransparentStream==='function'&&isTransparentStream()" in MESSAGES_JS
 
 
 def test_transparent_anchor_prose_receives_revealed_fade_text():
     render_section = slice_between(
         MESSAGES_JS,
         "const displayText = segmentStart===0",
-        "if(typeof _syncLiveWorklogReasonsForAnchor==='function')",
+        "scrollIfPinned();",
     )
     assert_contains_all(
         render_section,
         [
             "let anchorProcessText=displayText",
+            "if(assistantBody){",
             "const caughtUp=_renderStreamingFadeMarkdown(displayText)",
             "if(_shouldUseLiveProseFade())",
             "anchorProcessText=_streamFadeDomText||''",
             "if(anchorProcessText) _upsertAnchorProcessProse(anchorProcessText)",
         ],
     )
+    assert render_section.index("let anchorProcessText=displayText") < render_section.index("if(assistantBody){")
     assert render_section.index("anchorProcessText=_streamFadeDomText||''") < render_section.index(
         "_upsertAnchorProcessProse(anchorProcessText)"
+    )
+    assert render_section.index("if(assistantBody){") < render_section.rindex(
+        "if(anchorProcessText) _upsertAnchorProcessProse(anchorProcessText)"
     )
 
 
@@ -305,10 +317,17 @@ def test_stream_fade_done_drain_has_hard_cap_for_large_buffered_responses():
         drain_block,
         [
             "const drainStartedAt=performance.now();",
+            "const target=_streamFadeCurrentDisplayText();",
+            "const caughtUp=_renderStreamingFadeMarkdown(target);",
+            "const anchorProcessText=_streamFadeDomText||target;",
+            "if(anchorProcessText) _upsertAnchorProcessProse(anchorProcessText);",
             "performance.now()-drainStartedAt>=_STREAM_FADE_DONE_DRAIN_MAX_MS",
             "if(_smdParser) _smdEndParser();",
             "onDone();",
         ],
+    )
+    assert drain_block.index("_renderStreamingFadeMarkdown(target)") < drain_block.index(
+        "_upsertAnchorProcessProse(anchorProcessText)"
     )
 
 

@@ -4101,8 +4101,11 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
   function _shouldUseStreamFade(){
     return window._fadeTextEffect===true;
   }
+  function _shouldUseTransparentStreamFade(){
+    return typeof isTransparentStream==='function'&&isTransparentStream();
+  }
   function _shouldUseLiveProseFade(){
-    return _shouldUseStreamFade() || (typeof isTransparentStream==='function'&&isTransparentStream());
+    return _shouldUseStreamFade() || _shouldUseTransparentStreamFade();
   }
   function _streamFadeSkipNode(node){
     if(!node||node.nodeType!==1) return false;
@@ -4365,6 +4368,20 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     const next=_streamFadeNextText(displayText);
     if(!next.changed) return next.caughtUp;
     assistantBody.classList.add('stream-fade-active');
+    if(!_shouldUseTransparentStreamFade()){
+      if(!_smdParser&&window.smd){
+        if(_smdReconnect){assistantBody.innerHTML='';_smdReconnect=false;}
+        _smdNewParser(assistantBody,true);
+      }
+      if(_smdParser){
+        _smdWrite(next.text,true);
+      }else{
+        assistantBody.innerHTML=renderMd ? renderMd(next.text||'') : esc(next.text||'');
+        _sanitizeSmdLinks(assistantBody);
+      }
+      _streamFadeDomText=String(next.text||'');
+      return next.caughtUp;
+    }
     _streamFadeBindCleanup(assistantBody);
     if(_smdParser){
       _smdEndParser();
@@ -4397,6 +4414,8 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       if(!assistantBody){onDone();return;}
       const target=_streamFadeCurrentDisplayText();
       const caughtUp=_renderStreamingFadeMarkdown(target);
+      const anchorProcessText=_streamFadeDomText||target;
+      if(anchorProcessText) _upsertAnchorProcessProse(anchorProcessText);
       scrollIfPinned();
       if(caughtUp){
         // parser_end can flush pending markdown text; include that final text in
@@ -4771,11 +4790,11 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       const parsed=_cachedParsed&&_cachedParsedText===assistantText&&_cachedParsedReasoning===liveReasoningText ? _cachedParsed : _parseStreamState();
       _cachedParsed=null;
       _renderLiveThinking(parsed);
+      const displayText = segmentStart===0
+        ? parsed.displayText                          // first segment: uses think-tag stripping
+        : _stripXmlToolCalls(assistantText.slice(segmentStart));
+      let anchorProcessText=displayText;
       if(assistantBody){
-        const displayText = segmentStart===0
-          ? parsed.displayText                          // first segment: uses think-tag stripping
-          : _stripXmlToolCalls(assistantText.slice(segmentStart));
-        let anchorProcessText=displayText;
         if(_shouldUseLiveProseFade()){
           const caughtUp=_renderStreamingFadeMarkdown(displayText);
           anchorProcessText=_streamFadeDomText||'';
@@ -4803,9 +4822,9 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
             assistantBody.innerHTML = renderMd ? renderMd(fallbackText) : esc(fallbackText);
           }
         }
-        if(anchorProcessText) _upsertAnchorProcessProse(anchorProcessText);
         if(typeof _syncLiveWorklogReasonsForAnchor==='function') _syncLiveWorklogReasonsForAnchor(assistantRow, displayText);
       }
+      if(anchorProcessText) _upsertAnchorProcessProse(anchorProcessText);
       scrollIfPinned();
       _throttledSnapshotLiveTurn();
     };
