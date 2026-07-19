@@ -506,7 +506,7 @@ def _run_gateway_runs_api_streaming(
                 if approval_data:
                     approval_data["run_id"] = run_id
                     from api.config import gateway_supports_approval_identity_v1
-                    approval_data["_gateway_agent_identity_v1"] = gateway_supports_approval_identity_v1(base_url, api_key)
+                    approval_data["_gateway_agent_identity_v1"] = bool(approval_data.get("approval_id")) and gateway_supports_approval_identity_v1(base_url, api_key)
                     from api.route_approvals import submit_gateway_pending_mirror
                     head, total = submit_gateway_pending_mirror(session_id, approval_data)
                     put_gateway_event("approval", {**(head or approval_data), "pending_count": total})

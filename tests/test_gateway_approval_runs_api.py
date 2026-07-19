@@ -2158,6 +2158,59 @@ def test_synthetic_gateway_identity_stays_fifo_after_capability_upgrade():
     approvals._pending.pop("sess-upgrade", None)
 
 
+def test_agent_identity_v1_relays_the_ingress_identity_exactly():
+    """An Agent-issued v1 identity is the only targeted relay authority."""
+    from api import routes
+    from api.gateway_chat import _STREAM_RUN_IDS
+    import api.route_approvals as approvals
+
+    _STREAM_RUN_IDS["sid-v1"] = "run-v1"
+    approvals.submit_gateway_pending_mirror("sess-v1", {
+        "run_id": "run-v1", "approval_id": "agent-v1", "command": "echo x",
+        "_gateway_agent_identity_v1": True,
+    })
+    mirror = approvals.gateway_pending_mirror("sess-v1", approval_id="agent-v1", run_id="run-v1")
+    assert mirror["_gateway_agent_identity_v1"] is True
+    handler = MagicMock()
+    handler.wfile = io.BytesIO()
+    with patch("api.routes.get_session", return_value=SimpleNamespace(active_stream_id="sid-v1")), \
+         patch("api.config.gateway_supports_approval_identity_v1", return_value=True), \
+         patch("api.runner_client.HttpRunnerClient.respond_approval") as respond:
+        routes._handle_approval_respond(handler, {
+            "session_id": "sess-v1", "choice": "once", "approval_id": "agent-v1",
+        })
+    respond.assert_called_once_with("run-v1", "agent-v1", "once")
+    _STREAM_RUN_IDS.pop("sid-v1", None)
+    approvals._pending.pop("sess-v1", None)
+
+
+def test_capability_v1_empty_ingress_identity_stays_fifo_only():
+    """Capability alone cannot promote a locally synthesized gwrun identity."""
+    from api import routes
+    from api.gateway_chat import _STREAM_RUN_IDS
+    import api.route_approvals as approvals
+
+    _STREAM_RUN_IDS["sid-v1-empty"] = "run-v1-empty"
+    approvals.submit_gateway_pending_mirror("sess-v1-empty", {
+        "run_id": "run-v1-empty", "approval_id": "", "command": "echo x",
+        "_gateway_agent_identity_v1": False,
+    })
+    mirror = approvals.gateway_pending_mirror("sess-v1-empty", run_id="run-v1-empty")
+    assert mirror["approval_id"].startswith("gwrun:run-v1-empty:")
+    assert mirror["_gateway_agent_identity_v1"] is False
+    handler = MagicMock()
+    handler.wfile = io.BytesIO()
+    with patch("api.routes.get_session", return_value=SimpleNamespace(active_stream_id="sid-v1-empty")), \
+         patch("api.config.gateway_supports_approval_identity_v1", return_value=True), \
+         patch("api.runner_client.HttpRunnerClient.respond_approval") as respond:
+        routes._handle_approval_respond(handler, {
+            "session_id": "sess-v1-empty", "choice": "once", "approval_id": mirror["approval_id"],
+        })
+    respond.assert_called_once_with("run-v1-empty", "", "once")
+    _STREAM_RUN_IDS.pop("sid-v1-empty", None)
+    approvals._pending.pop("sess-v1-empty", None)
+
+
 def test_gateway_approval_response_without_approval_id_409s():
     """Gateway relay requires the emitted per-approval id, not bare run state."""
     from api.gateway_chat import _STREAM_RUN_IDS
