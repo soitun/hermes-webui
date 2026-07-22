@@ -9717,7 +9717,9 @@ from api.route_approvals import (  # noqa: F401 — re-exports for backward comp
     _GATEWAY_MIRROR_FLAG,
     _GATEWAY_MIRROR_TOKEN,
     _gateway_mirror_entry_token,
+    claim_gateway_approval_relay_owner,
     gateway_pending_mirror,
+    release_gateway_approval_relay_owner,
     retire_gateway_pending_mirror,
     reconcile_gateway_pending_mirror_locked,
     resolve_gateway_pending_local,
@@ -23948,6 +23950,10 @@ _GATEWAY_APPROVAL_RELAY_UNAVAILABLE = (
     "Gateway approval could not be relayed because the active run is unavailable. "
     "Reopen the session or retry after it reconnects."
 )
+_GATEWAY_APPROVAL_RELAY_IN_PROGRESS = (
+    "Another approval response for this Gateway run is already in progress. "
+    "Wait for it to finish, then retry if the card is still visible."
+)
 
 
 def _gateway_pending_approval_without_run_id(sid: str, approval_id: str) -> bool:
@@ -24117,20 +24123,68 @@ def _handle_approval_respond(handler, body):
             _cfg = _get_config()
             _base = _gateway_base_url(_cfg)
             _key = _gateway_api_key()
-            try:
-                identity_v1 = bool(matched_mirror.get(_GATEWAY_AGENT_IDENTITY_V1)) and gateway_supports_approval_identity_v1(_base, _key)
-                HttpRunnerClient(base_url=_base, api_key=_key).respond_approval(
-                    _run_id, matched_mirror["approval_id"] if identity_v1 else "", choice
+            claimed_approval_id = str(matched_mirror.get("approval_id") or "").strip()
+            if not claim_gateway_approval_relay_owner(sid, _run_id, claimed_approval_id):
+                return j(
+                    handler,
+                    {
+                        "ok": False,
+                        "choice": choice,
+                        "relayed": False,
+                        "code": "gateway_approval_in_progress",
+                        "error": _GATEWAY_APPROVAL_RELAY_IN_PROGRESS,
+                    },
+                    status=409,
                 )
-            except (RunnerClientError, ValueError) as exc:
-                return j(handler, {"ok": False, "choice": choice, "relayed": True, "error": str(exc)}, status=502)
-            # The outbound relay only resumes the remote run; the local mirror
-            # still needs the same cleanup path so the parked entry, mirrored
-            # card, and agent signal all settle here too.
-            cleanup_approval_id = matched_mirror["approval_id"]
-            _resolve_approval_legacy(sid, cleanup_approval_id, choice, run_id=_run_id)
-            retire_gateway_pending_mirror(sid, approval_id=cleanup_approval_id, run_id=_run_id)
-            return j(handler, {"ok": True, "choice": choice, "relayed": True})
+            try:
+                current_mirror = gateway_pending_mirror(
+                    sid,
+                    approval_id=claimed_approval_id,
+                    run_id=_run_id,
+                )
+                if not current_mirror:
+                    return j(
+                        handler,
+                        {
+                            "ok": False,
+                            "choice": choice,
+                            "relayed": False,
+                            "code": "gateway_run_unavailable",
+                            "error": _GATEWAY_APPROVAL_RELAY_UNAVAILABLE,
+                        },
+                        status=409,
+                    )
+                identity_v1 = bool(current_mirror.get(_GATEWAY_AGENT_IDENTITY_V1)) and gateway_supports_approval_identity_v1(_base, _key)
+                if not identity_v1:
+                    run_head = gateway_pending_mirror(sid, run_id=_run_id)
+                    if not run_head or str(run_head.get("approval_id") or "").strip() != claimed_approval_id:
+                        return j(
+                            handler,
+                            {
+                                "ok": False,
+                                "choice": choice,
+                                "relayed": False,
+                                "code": "gateway_run_unavailable",
+                                "error": _GATEWAY_APPROVAL_RELAY_UNAVAILABLE,
+                            },
+                            status=409,
+                        )
+                matched_mirror = current_mirror
+                try:
+                    HttpRunnerClient(base_url=_base, api_key=_key).respond_approval(
+                        _run_id, matched_mirror["approval_id"] if identity_v1 else "", choice
+                    )
+                except (RunnerClientError, ValueError) as exc:
+                    return j(handler, {"ok": False, "choice": choice, "relayed": True, "error": str(exc)}, status=502)
+                # The outbound relay only resumes the remote run; the local mirror
+                # still needs the same cleanup path so the parked entry, mirrored
+                # card, and agent signal all settle here too.
+                cleanup_approval_id = matched_mirror["approval_id"]
+                _resolve_approval_legacy(sid, cleanup_approval_id, choice, run_id=_run_id)
+                retire_gateway_pending_mirror(sid, approval_id=cleanup_approval_id, run_id=_run_id)
+                return j(handler, {"ok": True, "choice": choice, "relayed": True})
+            finally:
+                release_gateway_approval_relay_owner(sid, _run_id, claimed_approval_id)
         if _candidate_run_id:
             return j(handler, {"ok": False, "choice": choice, "relayed": False,
                                "code": "gateway_run_unavailable",

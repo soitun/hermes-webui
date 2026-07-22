@@ -12,6 +12,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
+_MISSING = object()
+_TEST_ROUTE_SESSION_LOCK = threading.Lock()
+_TEST_ROUTE_SESSION_PRIOR: dict[str, object] = {}
+_TEST_ROUTE_SESSION_REFCOUNTS: dict[str, int] = {}
+
+
 def _reset_gateway_run_start_state(stream_id: str) -> None:
     from api import gateway_chat
 
@@ -19,6 +25,49 @@ def _reset_gateway_run_start_state(stream_id: str) -> None:
     lifecycle = getattr(gateway_chat, "_STREAM_RUN_LIFECYCLE", None)
     if isinstance(lifecycle, dict):
         lifecycle.pop(stream_id, None)
+
+
+def _invoke_gateway_approval_response(results: dict, key: str, session, body: dict) -> None:
+    handler = MagicMock()
+    handler.wfile = io.BytesIO()
+    from api.models import Session, SESSIONS
+    from api.routes import _handle_approval_respond
+
+    sid = str(body.get("session_id") or "")
+    route_session = Session(
+        session_id=sid,
+        workspace=".",
+        model=getattr(session, "model", "test-model"),
+        model_provider=getattr(session, "model_provider", "test-provider"),
+        messages=list(getattr(session, "messages", []) or []),
+        context_messages=list(getattr(session, "context_messages", []) or []),
+        active_stream_id=getattr(session, "active_stream_id", None),
+        profile=getattr(session, "profile", None),
+    )
+    with _TEST_ROUTE_SESSION_LOCK:
+        refs = _TEST_ROUTE_SESSION_REFCOUNTS.get(sid, 0)
+        if refs == 0:
+            _TEST_ROUTE_SESSION_PRIOR[sid] = SESSIONS.get(sid, _MISSING)
+            SESSIONS[sid] = route_session
+        _TEST_ROUTE_SESSION_REFCOUNTS[sid] = refs + 1
+    try:
+        _handle_approval_respond(handler, body)
+    finally:
+        with _TEST_ROUTE_SESSION_LOCK:
+            refs = _TEST_ROUTE_SESSION_REFCOUNTS.get(sid, 0) - 1
+            if refs > 0:
+                _TEST_ROUTE_SESSION_REFCOUNTS[sid] = refs
+            else:
+                _TEST_ROUTE_SESSION_REFCOUNTS.pop(sid, None)
+                prior = _TEST_ROUTE_SESSION_PRIOR.pop(sid, _MISSING)
+                if prior is _MISSING:
+                    SESSIONS.pop(sid, None)
+                else:
+                    SESSIONS[sid] = prior
+    results[key] = (
+        handler.send_response.call_args.args[0],
+        json.loads(handler.wfile.getvalue().decode("utf-8")),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -3053,6 +3102,317 @@ def test_gateway_approval_response_invalid_gateway_base_returns_502():
 
     _STREAM_RUN_IDS.pop("sid-relay-invalid-base", None)
     approvals._pending.pop("sess-relay", None)
+
+
+def test_identityless_gateway_relay_duplicate_response_is_single_flight():
+    from api.gateway_chat import _STREAM_RUN_IDS
+    import api.route_approvals as approvals
+
+    sid = "sess-relay-single-flight"
+    stream_id = "sid-relay-single-flight"
+    _STREAM_RUN_IDS[stream_id] = "run-shared"
+    approvals._pending.pop(sid, None)
+    approvals._gateway_queues.pop(sid, None)
+    try:
+        approvals.submit_gateway_pending_mirror(sid, {"run_id": "run-shared", "command": "first"})
+        approvals.submit_gateway_pending_mirror(sid, {"run_id": "run-shared", "command": "second"})
+        first_id = approvals.gateway_pending_mirror(sid, run_id="run-shared")["approval_id"]
+        second_id = approvals._pending[sid][1]["approval_id"]
+        session = SimpleNamespace(active_stream_id=stream_id)
+        relay_started = threading.Event()
+        release_relay = threading.Event()
+        results = {}
+        calls = []
+
+        def blocked_respond(run_id, approval_id, choice):
+            calls.append((run_id, approval_id, choice))
+            relay_started.set()
+            assert release_relay.wait(timeout=5)
+
+        with patch("api.gateway_chat._gateway_base_url", return_value="http://gw:8642"), \
+             patch("api.gateway_chat._gateway_api_key", return_value=""), \
+             patch("api.config.gateway_supports_approval_identity_v1", return_value=False), \
+             patch("api.runner_client.HttpRunnerClient.respond_approval", side_effect=blocked_respond):
+            t1 = threading.Thread(
+                target=_invoke_gateway_approval_response,
+                args=(results, "first", session, {"session_id": sid, "choice": "once", "approval_id": first_id}),
+                daemon=True,
+            )
+            t2 = threading.Thread(
+                target=_invoke_gateway_approval_response,
+                args=(results, "second", session, {"session_id": sid, "choice": "once", "approval_id": first_id}),
+                daemon=True,
+            )
+            t1.start()
+            assert relay_started.wait(timeout=5)
+            t2.start()
+            t2.join(timeout=5)
+            assert not t2.is_alive()
+            release_relay.set()
+            t1.join(timeout=5)
+            assert not t1.is_alive()
+
+        assert calls == [("run-shared", "", "once")]
+        assert results["first"][0] == 200
+        assert results["first"][1]["relayed"] is True
+        assert results["second"][0] == 409
+        assert results["second"][1]["code"] == "gateway_approval_in_progress"
+        promoted = approvals.gateway_pending_mirror(sid, run_id="run-shared")
+        assert promoted is not None
+        assert promoted["approval_id"] == second_id
+    finally:
+        _STREAM_RUN_IDS.pop(stream_id, None)
+        approvals._pending.pop(sid, None)
+        approvals._gateway_queues.pop(sid, None)
+
+
+def test_identityless_gateway_relay_conflicting_duplicate_choice_returns_busy():
+    from api.gateway_chat import _STREAM_RUN_IDS
+    import api.route_approvals as approvals
+
+    sid = "sess-relay-conflicting-choice"
+    stream_id = "sid-relay-conflicting-choice"
+    _STREAM_RUN_IDS[stream_id] = "run-shared"
+    approvals._pending.pop(sid, None)
+    approvals._gateway_queues.pop(sid, None)
+    try:
+        approvals.submit_gateway_pending_mirror(sid, {"run_id": "run-shared", "command": "first"})
+        first_id = approvals.gateway_pending_mirror(sid, run_id="run-shared")["approval_id"]
+        session = SimpleNamespace(active_stream_id=stream_id)
+        relay_started = threading.Event()
+        release_relay = threading.Event()
+        results = {}
+        calls = []
+
+        def blocked_respond(run_id, approval_id, choice):
+            calls.append((run_id, approval_id, choice))
+            relay_started.set()
+            assert release_relay.wait(timeout=5)
+
+        with patch("api.gateway_chat._gateway_base_url", return_value="http://gw:8642"), \
+             patch("api.gateway_chat._gateway_api_key", return_value=""), \
+             patch("api.config.gateway_supports_approval_identity_v1", return_value=False), \
+             patch("api.runner_client.HttpRunnerClient.respond_approval", side_effect=blocked_respond):
+            t1 = threading.Thread(
+                target=_invoke_gateway_approval_response,
+                args=(results, "first", session, {"session_id": sid, "choice": "once", "approval_id": first_id}),
+                daemon=True,
+            )
+            t2 = threading.Thread(
+                target=_invoke_gateway_approval_response,
+                args=(results, "second", session, {"session_id": sid, "choice": "deny", "approval_id": first_id}),
+                daemon=True,
+            )
+            t1.start()
+            assert relay_started.wait(timeout=5)
+            t2.start()
+            t2.join(timeout=5)
+            assert not t2.is_alive()
+            release_relay.set()
+            t1.join(timeout=5)
+            assert not t1.is_alive()
+
+        assert calls == [("run-shared", "", "once")]
+        assert results["first"][0] == 200
+        assert results["second"][0] == 409
+        assert results["second"][1]["code"] == "gateway_approval_in_progress"
+    finally:
+        _STREAM_RUN_IDS.pop(stream_id, None)
+        approvals._pending.pop(sid, None)
+        approvals._gateway_queues.pop(sid, None)
+
+
+def test_identityless_gateway_relay_failure_releases_owner_for_retry():
+    from api.gateway_chat import _STREAM_RUN_IDS
+    from api.runner_client import RunnerClientError
+    import api.route_approvals as approvals
+
+    sid = "sess-relay-retry-after-failure"
+    stream_id = "sid-relay-retry-after-failure"
+    _STREAM_RUN_IDS[stream_id] = "run-shared"
+    approvals._pending.pop(sid, None)
+    approvals._gateway_queues.pop(sid, None)
+    try:
+        approvals.submit_gateway_pending_mirror(sid, {"run_id": "run-shared", "command": "first"})
+        approvals.submit_gateway_pending_mirror(sid, {"run_id": "run-shared", "command": "second"})
+        first_id = approvals.gateway_pending_mirror(sid, run_id="run-shared")["approval_id"]
+        second_id = approvals._pending[sid][1]["approval_id"]
+        session = SimpleNamespace(active_stream_id=stream_id)
+        relay_started = threading.Event()
+        release_relay = threading.Event()
+        results = {}
+        calls = []
+
+        def flaky_respond(run_id, approval_id, choice):
+            calls.append((run_id, approval_id, choice))
+            if len(calls) == 1:
+                relay_started.set()
+                assert release_relay.wait(timeout=5)
+                raise RunnerClientError("relay failed")
+
+        with patch("api.gateway_chat._gateway_base_url", return_value="http://gw:8642"), \
+             patch("api.gateway_chat._gateway_api_key", return_value=""), \
+             patch("api.config.gateway_supports_approval_identity_v1", return_value=False), \
+             patch("api.runner_client.HttpRunnerClient.respond_approval", side_effect=flaky_respond):
+            t1 = threading.Thread(
+                target=_invoke_gateway_approval_response,
+                args=(results, "first", session, {"session_id": sid, "choice": "once", "approval_id": first_id}),
+                daemon=True,
+            )
+            t2 = threading.Thread(
+                target=_invoke_gateway_approval_response,
+                args=(results, "second", session, {"session_id": sid, "choice": "once", "approval_id": first_id}),
+                daemon=True,
+            )
+            t1.start()
+            assert relay_started.wait(timeout=5)
+            t2.start()
+            t2.join(timeout=5)
+            assert not t2.is_alive()
+            release_relay.set()
+            t1.join(timeout=5)
+            assert not t1.is_alive()
+            _invoke_gateway_approval_response(
+                results,
+                "retry",
+                session,
+                {"session_id": sid, "choice": "once", "approval_id": first_id},
+            )
+
+        assert calls == [
+            ("run-shared", "", "once"),
+            ("run-shared", "", "once"),
+        ]
+        assert results["first"][0] == 502
+        assert results["second"][0] == 409
+        assert results["second"][1]["code"] == "gateway_approval_in_progress"
+        assert results["retry"][0] == 200
+        promoted = approvals.gateway_pending_mirror(sid, run_id="run-shared")
+        assert promoted is not None
+        assert promoted["approval_id"] == second_id
+    finally:
+        _STREAM_RUN_IDS.pop(stream_id, None)
+        approvals._pending.pop(sid, None)
+        approvals._gateway_queues.pop(sid, None)
+
+
+def test_identityless_gateway_relay_keeps_different_runs_parallel():
+    import api.route_approvals as approvals
+
+    sid = "sess-relay-parallel-runs"
+    approvals._pending.pop(sid, None)
+    approvals._gateway_queues.pop(sid, None)
+    try:
+        approvals.submit_gateway_pending_mirror(sid, {"run_id": "run-a", "approval_id": "appr-a", "command": "first"})
+        approvals.submit_gateway_pending_mirror(sid, {"run_id": "run-b", "approval_id": "appr-b", "command": "second"})
+        session = SimpleNamespace(active_stream_id=None)
+        first_started = threading.Event()
+        second_started = threading.Event()
+        release_relays = threading.Event()
+        results = {}
+        calls = []
+
+        def parallel_respond(run_id, approval_id, choice):
+            calls.append((run_id, approval_id, choice))
+            if run_id == "run-a":
+                first_started.set()
+            elif run_id == "run-b":
+                second_started.set()
+            assert release_relays.wait(timeout=5)
+
+        with patch("api.gateway_chat._gateway_base_url", return_value="http://gw:8642"), \
+             patch("api.gateway_chat._gateway_api_key", return_value=""), \
+             patch("api.config.gateway_supports_approval_identity_v1", return_value=False), \
+             patch("api.runner_client.HttpRunnerClient.respond_approval", side_effect=parallel_respond):
+            t1 = threading.Thread(
+                target=_invoke_gateway_approval_response,
+                args=(results, "first", session, {"session_id": sid, "choice": "once", "approval_id": "appr-a"}),
+                daemon=True,
+            )
+            t2 = threading.Thread(
+                target=_invoke_gateway_approval_response,
+                args=(results, "second", session, {"session_id": sid, "choice": "deny", "approval_id": "appr-b"}),
+                daemon=True,
+            )
+            t1.start()
+            t2.start()
+            assert first_started.wait(timeout=5)
+            assert second_started.wait(timeout=5)
+            release_relays.set()
+            t1.join(timeout=5)
+            t2.join(timeout=5)
+            assert not t1.is_alive()
+            assert not t2.is_alive()
+
+        assert sorted(calls) == [("run-a", "", "once"), ("run-b", "", "deny")]
+        assert results["first"][0] == 200
+        assert results["second"][0] == 200
+        assert approvals.gateway_pending_mirror(sid, run_id="run-a") is None
+        assert approvals.gateway_pending_mirror(sid, run_id="run-b") is None
+    finally:
+        approvals._pending.pop(sid, None)
+        approvals._gateway_queues.pop(sid, None)
+
+
+def test_identityless_gateway_relay_revalidates_head_after_claim_and_releases_owner():
+    from api.gateway_chat import _STREAM_RUN_IDS
+    import api.route_approvals as approvals
+
+    sid = "sess-relay-head-advance-after-claim"
+    stream_id = "sid-relay-head-advance-after-claim"
+    _STREAM_RUN_IDS[stream_id] = "run-shared"
+    approvals._pending.pop(sid, None)
+    approvals._gateway_queues.pop(sid, None)
+    try:
+        approvals.submit_gateway_pending_mirror(sid, {"run_id": "run-shared", "command": "first"})
+        approvals.submit_gateway_pending_mirror(sid, {"run_id": "run-shared", "command": "second"})
+        first_id = approvals.gateway_pending_mirror(sid, run_id="run-shared")["approval_id"]
+        second_id = approvals._pending[sid][1]["approval_id"]
+        session = SimpleNamespace(active_stream_id=stream_id)
+        real_gateway_pending_mirror = approvals.gateway_pending_mirror
+        advanced = {"done": False}
+
+        def advance_head_after_claim(*args, **kwargs):
+            mirror = real_gateway_pending_mirror(*args, **kwargs)
+            approval_id = kwargs.get("approval_id") if kwargs else args[1] if len(args) > 1 else ""
+            run_id = kwargs.get("run_id") if kwargs else args[2] if len(args) > 2 else ""
+            if not advanced["done"] and approval_id == first_id and run_id == "run-shared":
+                advanced["done"] = True
+                assert approvals.retire_gateway_pending_mirror(sid, approval_id=first_id, run_id="run-shared")
+            return mirror
+
+        with patch("api.gateway_chat._gateway_base_url", return_value="http://gw:8642"), \
+             patch("api.gateway_chat._gateway_api_key", return_value=""), \
+             patch("api.config.gateway_supports_approval_identity_v1", return_value=False), \
+             patch("api.routes.gateway_pending_mirror", side_effect=advance_head_after_claim), \
+             patch("api.runner_client.HttpRunnerClient.respond_approval") as respond:
+            results = {}
+            _invoke_gateway_approval_response(
+                results,
+                "stale",
+                session,
+                {"session_id": sid, "choice": "once", "approval_id": first_id},
+            )
+
+            assert results["stale"][0] == 409
+            assert results["stale"][1]["code"] == "gateway_run_unavailable"
+            respond.assert_not_called()
+            live = approvals.gateway_pending_mirror(sid, run_id="run-shared")
+            assert live is not None
+            assert live["approval_id"] == second_id
+
+            _invoke_gateway_approval_response(
+                results,
+                "retry",
+                session,
+                {"session_id": sid, "choice": "once", "approval_id": second_id},
+            )
+
+        assert results["retry"][0] == 200
+    finally:
+        _STREAM_RUN_IDS.pop(stream_id, None)
+        approvals._pending.pop(sid, None)
+        approvals._gateway_queues.pop(sid, None)
 
 
 # ---------------------------------------------------------------------------

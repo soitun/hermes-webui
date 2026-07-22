@@ -49,6 +49,7 @@ _GATEWAY_MIRROR_TOKEN = "_gateway_mirror_token"
 _GATEWAY_MIRROR_RETAINED = "_gateway_mirror_retained"
 _GATEWAY_ENTRY_DATA_TOKEN_KEY = "_webui_mirror_token"
 _GATEWAY_AGENT_IDENTITY_V1 = "_gateway_agent_identity_v1"
+_gateway_relay_owners: dict[tuple[str, str], str] = {}
 
 
 def _approval_sse_subscribe(session_id: str) -> queue.Queue:
@@ -315,6 +316,36 @@ def gateway_pending_mirror(session_key: str, approval_id: str = "", run_id: str 
         reconcile_gateway_pending_mirror_locked(session_key)
         entry = _gateway_pending_mirror_locked(session_key, approval_id, run_id)
         return dict(entry) if entry else None
+
+
+def claim_gateway_approval_relay_owner(session_key: str, run_id: str, approval_id: str) -> bool:
+    """Claim the single-flight relay owner for one `(session, run)` pair."""
+    session_key = str(session_key or "").strip()
+    run_id = str(run_id or "").strip()
+    approval_id = str(approval_id or "").strip()
+    if not session_key or not run_id:
+        return False
+    with _lock:
+        key = (session_key, run_id)
+        if key in _gateway_relay_owners:
+            return False
+        _gateway_relay_owners[key] = approval_id
+        return True
+
+
+def release_gateway_approval_relay_owner(session_key: str, run_id: str, approval_id: str = "") -> None:
+    """Release the single-flight relay owner for one `(session, run)` pair."""
+    session_key = str(session_key or "").strip()
+    run_id = str(run_id or "").strip()
+    approval_id = str(approval_id or "").strip()
+    if not session_key or not run_id:
+        return
+    with _lock:
+        key = (session_key, run_id)
+        current = str(_gateway_relay_owners.get(key) or "").strip()
+        if approval_id and current and current != approval_id:
+            return
+        _gateway_relay_owners.pop(key, None)
 
 
 def retire_gateway_pending_mirror(session_key: str, approval_id: str = "", run_id: str = "") -> bool:
